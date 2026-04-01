@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: neura-postgres
+    environment:
+      POSTGRES_DB: neura
+      POSTGRES_USER: neura
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neura"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    mem_limit: 512m
+    shm_size: 128m
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: neura-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      - "127.0.0.1:6379:6379"
+
+volumes:
+  pgdata:

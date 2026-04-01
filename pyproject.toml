@@ -1,0 +1,9 @@
+[project]
+name = "neura"
+version = "2.0.0-alpha"
+description = "Neura Platform v2 — AI Agent Runtime"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
