@@ -47,25 +47,30 @@ class MemoryStore:
     """CRUD for all capsule memory: diary, long-term, learnings."""
 
     def __init__(self, pool):
+        if pool is None:
+            raise ValueError("Database pool cannot be None")
         self._pool = pool
 
     # === Diary ===
 
     async def add_diary(self, entry: DiaryEntry) -> int:
         """Insert a diary entry, return its ID."""
+        # asyncpg requires date/time objects, not strings
+        d = date.fromisoformat(entry.date) if isinstance(entry.date, str) else entry.date
+        t = time.fromisoformat(entry.time) if isinstance(entry.time, str) else entry.time
         return await self._pool.fetchval(
             """INSERT INTO diary (capsule_id, date, time, source,
                user_message, bot_response, model, duration_sec, tools_used)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                RETURNING id""",
-            entry.capsule_id, entry.date, entry.time, entry.source,
+            entry.capsule_id, d, t, entry.source,
             entry.user_message, entry.bot_response, entry.model,
             entry.duration_sec, entry.tools_used,
         )
 
     async def get_today_diary(self, capsule_id: str, limit: int = 10) -> list[DiaryEntry]:
         """Get today's diary entries (most recent first)."""
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = datetime.now(timezone.utc).date()
         rows = await self._pool.fetch(
             """SELECT * FROM diary
                WHERE capsule_id = $1 AND date = $2
@@ -77,8 +82,8 @@ class MemoryStore:
     async def get_recent_diary(self, capsule_id: str,
                                days: int = 3, per_day: int = 5) -> list[DiaryEntry]:
         """Get recent diary entries (excluding today)."""
-        since = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
-        today = datetime.now(timezone.utc).date().isoformat()
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).date()
+        today = datetime.now(timezone.utc).date()
         rows = await self._pool.fetch(
             """SELECT * FROM diary
                WHERE capsule_id = $1 AND date >= $2 AND date < $3
@@ -90,7 +95,7 @@ class MemoryStore:
     async def search_diary(self, capsule_id: str, query: str,
                            days: int = 14, limit: int = 5) -> list[DiaryEntry]:
         """Search diary by keyword (ILIKE)."""
-        since = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).date()
         rows = await self._pool.fetch(
             """SELECT * FROM diary
                WHERE capsule_id = $1 AND date >= $2

@@ -13,6 +13,13 @@ def _mock_pool():
     return pool
 
 
+class TestInit:
+    def test_pool_none_raises(self):
+        from neura.core.memory import MemoryStore
+        with pytest.raises(ValueError, match="pool"):
+            MemoryStore(None)
+
+
 class TestDiary:
     @pytest.mark.asyncio
     async def test_add_diary(self):
