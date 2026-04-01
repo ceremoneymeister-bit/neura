@@ -1,0 +1,53 @@
+id: dmitry_rostovcev
+name: "Дмитрий AI"
+
+owner:
+  name: "Дмитрий Ростовцев"
+  telegram_id: 5200420702
+
+telegram:
+  bot_token: "placeholder_for_smoke_test"
+  features:
+    streaming: true
+    voice_input: true
+    file_tools: true
+    proactive: true
+    btw_queue: true
+
+claude:
+  model: sonnet
+  effort: standard
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - Write
+    - Edit
+    - WebSearch
+    - WebFetch
+    - "Bash(python3|ls|mkdir|cat)"
+  system_prompt: "dmitry/SYSTEM.md"
+
+skills:
+  - copywriting
+  - smart-response
+  - content-creator
+
+memory:
+  diary_retention_days: 360
+  max_long_term_entries: 500
+  context_window:
+    today_diary: 30
+    recent_days: 7
+    recent_per_day: 10
+    learnings_chars: 3000
+    corrections_chars: 3000
+
+employees: []
+
+rate_limit:
+  max_per_day: 500
+  warn_at: 400
+
+trial:
+  enabled: false
