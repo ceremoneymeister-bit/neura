@@ -202,8 +202,10 @@ class TelegramTransport:
 
         capsule: Capsule = context.bot_data["capsule"]
         user_id = update.effective_user.id
+        logger.info(f"Text from user_id={user_id}, name={update.effective_user.first_name}, text={msg.text[:50]!r}")
 
         if not capsule.is_employee(user_id):
+            logger.warning(f"User {user_id} not authorized for capsule {capsule.config.id} (owner={capsule.config.owner_telegram_id})")
             return
 
         if capsule.is_trial_expired():
@@ -395,13 +397,16 @@ class TelegramTransport:
             parts = await self._memory.build_context_parts(capsule, incoming.text)
             builder = ContextBuilder(capsule)
             full_prompt = builder.build(incoming.text, parts, is_first_message=True)
+            logger.info(f"[{cap_id}] Context built, prompt length={len(full_prompt)}")
 
             # 2. Stream response
             engine_cfg = capsule.get_engine_config()
             responder = StreamingResponder(msg, existing_msg=status_msg)
             await responder.start()
 
+            chunk_count = 0
             async for chunk in self._engine.stream(full_prompt, engine_cfg):
+                chunk_count += 1
                 if chunk.type == "text":
                     accumulated_text += chunk.text
                     await responder.on_text(accumulated_text)
@@ -410,6 +415,10 @@ class TelegramTransport:
                     await responder.on_tool(chunk.text)
                 elif chunk.type == "result":
                     accumulated_text = chunk.text or accumulated_text
+                elif chunk.type == "error":
+                    logger.error(f"[{cap_id}] Engine error chunk: {chunk.text}")
+
+            logger.info(f"[{cap_id}] Stream done: {chunk_count} chunks, {len(accumulated_text)} chars")
 
             # 3. Parse response
             response = ResponseParser.parse(accumulated_text)
@@ -424,14 +433,17 @@ class TelegramTransport:
             if warn_rate:
                 response.text += "\n\n⚠️ Приближаетесь к лимиту запросов на сегодня."
 
-            # 6. Finalize streaming + send
+            # 6. Finalize streaming message
             await responder.finalize(response)
-            await self._send_response(msg, response)
 
-            # 7. Diary
+            # 7. Send response (only if finalize deleted the message — long/files)
+            if not responder._response_msg or response.files:
+                await self._send_response(msg, response)
+
+            # 8. Diary
             await self._save_diary(capsule, incoming, accumulated_text, tools_used)
 
-            # 8. Rate counter
+            # 9. Rate counter
             await self._queue.increment_rate(cap_id)
 
         except Exception as e:

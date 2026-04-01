@@ -3,10 +3,10 @@ name: "Дмитрий AI"
 
 owner:
   name: "Дмитрий Ростовцев"
-  telegram_id: 5200420702
+  telegram_id: 1260958591
 
 telegram:
-  bot_token: "placeholder_for_smoke_test"
+  bot_token: "${DMITRY_BOT_TOKEN}"
   features:
     streaming: true
     voice_input: true

@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 import sys
+from pathlib import Path
 
 from neura.core.capsule import Capsule
 from neura.core.engine import ClaudeEngine
@@ -19,6 +20,19 @@ from neura.storage.db import Database
 from neura.transport.telegram import TelegramTransport
 
 logger = logging.getLogger(__name__)
+
+
+def _load_dotenv() -> None:
+    """Load .env file from project root if it exists."""
+    env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
 
 
 async def create_app(config_dir: str = "config/capsules") -> dict:
@@ -93,6 +107,7 @@ async def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
 
+    _load_dotenv()
     app = await create_app()
     transport: TelegramTransport = app["transport"]
 
