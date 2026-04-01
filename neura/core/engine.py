@@ -217,6 +217,7 @@ class ClaudeEngine:
         )
 
         try:
+            assert proc.stdout is not None
             while True:
                 line = await asyncio.wait_for(
                     proc.stdout.readline(), timeout=cfg.timeout

@@ -189,4 +189,4 @@ class Capsule:
         if started_at.tzinfo is None:
             started_at = started_at.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        return (now - started_at).days > days
+        return bool((now - started_at).days > days)
