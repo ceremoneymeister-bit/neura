@@ -1,0 +1,9 @@
+id: minimal
+name: "Minimal Bot"
+
+owner:
+  name: "Owner"
+  telegram_id: 111222333
+
+telegram:
+  bot_token: "raw-token-no-env"

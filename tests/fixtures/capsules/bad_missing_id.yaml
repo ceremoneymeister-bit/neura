@@ -1,0 +1,8 @@
+name: "No ID Bot"
+
+owner:
+  name: "Owner"
+  telegram_id: 111
+
+telegram:
+  bot_token: "token"

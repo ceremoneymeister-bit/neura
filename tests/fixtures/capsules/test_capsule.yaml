@@ -1,0 +1,48 @@
+id: test_capsule
+name: "Test Bot"
+
+owner:
+  name: "Test Owner"
+  telegram_id: 123456789
+
+telegram:
+  bot_token: "${TEST_BOT_TOKEN}"
+  features:
+    streaming: true
+    voice_input: false
+    file_tools: true
+
+claude:
+  model: sonnet
+  effort: standard
+  allowed_tools:
+    - Read
+    - Grep
+    - WebSearch
+  system_prompt: "test_capsule/SYSTEM.md"
+
+skills:
+  - copywriting
+  - smart-response
+
+memory:
+  diary_retention_days: 90
+  max_long_term_entries: 100
+  context_window:
+    today_diary: 10
+    recent_days: 3
+
+employees:
+  - telegram_id: 123456789
+    role: owner
+    name: "Test Owner"
+  - telegram_id: 987654321
+    role: staff
+    name: "Staff Member"
+
+rate_limit:
+  max_per_day: 100
+  warn_at: 50
+
+trial:
+  enabled: false

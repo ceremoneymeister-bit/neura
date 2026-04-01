@@ -1,0 +1,14 @@
+id: trial_capsule
+name: "Trial Bot"
+
+owner:
+  name: "Trial User"
+  telegram_id: 555666777
+
+telegram:
+  bot_token: "trial-token"
+
+trial:
+  enabled: true
+  days: 5
+  started_at: "2026-03-20T00:00:00"
