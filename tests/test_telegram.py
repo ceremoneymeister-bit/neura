@@ -23,9 +23,10 @@ def _make_capsule(capsule_id="test_cap", bot_token="123:ABC",
     cap.config.bot_token = bot_token
     cap.config.owner_telegram_id = owner_tg_id
     cap.config.rate_limit = {"max_per_day": rate_max, "warn_at": 50}
-    cap.config.home_dir = f"/tmp/claude-homes/{capsule_id}"
+    cap.config.home_dir = f"/tmp/test-homes/{capsule_id}"
     cap.config.model = "sonnet"
     cap.config.features = {"streaming": True, "voice": True}
+    cap.config.trial = {"enabled": trial_expired, "days": 5}
     cap.is_employee = MagicMock(return_value=True)
     cap.is_trial_expired = MagicMock(return_value=trial_expired)
     cap.get_engine_config = MagicMock()
@@ -230,6 +231,7 @@ class TestHandleVoice:
 
         cap = _make_capsule()
         queue = AsyncMock()
+        queue.is_processing = AsyncMock(return_value=False)
         queue.check_rate_limit = AsyncMock(return_value=None)
         transport = TelegramTransport({"t": cap}, MagicMock(), MagicMock(), queue)
 

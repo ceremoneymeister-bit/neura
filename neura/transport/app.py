@@ -15,9 +15,12 @@ from neura.core.capsule import Capsule
 from neura.core.engine import ClaudeEngine
 from neura.core.memory import MemoryStore
 from neura.core.queue import RequestQueue
+from neura.core.skills import SkillRegistry
+from neura.monitoring import setup_monitoring, SERVICE_START, SERVICE_STOP
 from neura.storage.cache import Cache
 from neura.storage.db import Database
 from neura.transport.telegram import TelegramTransport
+from neura.transport.web import create_web_app
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +55,20 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
     memory = MemoryStore(db.pool)
     queue = RequestQueue(cache.redis)
 
-    # 4. Load capsules
+    # 4. Load capsules + skills
     capsules = Capsule.load_all(config_dir)
     if not capsules:
         logger.error(f"No capsules found in {config_dir}. Exiting.")
         sys.exit(1)
     logger.info(f"Loaded {len(capsules)} capsule(s): {', '.join(capsules.keys())}")
+
+    # 4b. Load skills and attach to capsules
+    skill_registry = SkillRegistry()
+    skill_registry.scan()
+    for cap in capsules.values():
+        cap_skills = skill_registry.get_for_capsule(cap.config.skills)
+        cap._skills_table = skill_registry.format_table(cap_skills)
+        logger.info(f"  {cap.config.id}: {len(cap_skills)} skills loaded")
 
     # 5. Register capsules in DB (upsert)
     for cap in capsules.values():
@@ -67,8 +78,18 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
             cap.config.id, cap.config.name,
         )
 
-    # 6. Transport
-    transport = TelegramTransport(capsules, engine, memory, queue)
+    # 6. Monitoring
+    monitoring = await setup_monitoring(db.pool, cache.redis, capsules)
+
+    # 7. Transport
+    transport = TelegramTransport(
+        capsules, engine, memory, queue,
+        metrics=monitoring["metrics"],
+        alert_sender=monitoring["alert_sender"],
+    )
+
+    # 8. Web API (FastAPI + uvicorn)
+    web_app = create_web_app(db.pool, engine, memory, queue, capsules)
 
     return {
         "db": db,
@@ -78,12 +99,27 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         "queue": queue,
         "capsules": capsules,
         "transport": transport,
+        "monitoring": monitoring,
+        "web_app": web_app,
     }
 
 
 async def shutdown(app: dict) -> None:
-    """Graceful shutdown: transport → cache → db."""
+    """Graceful shutdown: monitoring → transport → cache → db."""
     logger.info("Shutting down...")
+
+    # Stop monitoring first
+    monitoring = app.get("monitoring")
+    if monitoring:
+        await monitoring["health"].stop()
+        try:
+            await monitoring["alert_sender"].send(
+                "Graceful shutdown",
+                alert_type=SERVICE_STOP,
+                deduplicate=False,
+            )
+        except Exception:
+            pass
 
     transport = app.get("transport")
     if transport:
@@ -102,6 +138,8 @@ async def shutdown(app: dict) -> None:
 
 async def main() -> None:
     """Application lifecycle: init → run → shutdown."""
+    import uvicorn
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -122,13 +160,40 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, _signal_handler)
 
-    # Start
+    # Start monitoring
+    monitoring = app["monitoring"]
+    health = monitoring["health"]
+    alert_sender = monitoring["alert_sender"]
+
+    await health.start()
+    capsule_count = len(app["capsules"])
+    await alert_sender.send(
+        f"Запущено {capsule_count} капсул(а)",
+        alert_type=SERVICE_START,
+        deduplicate=False,
+    )
+
+    # Start Web API (uvicorn)
+    web_port = int(os.environ.get("WEB_PORT", "8080"))
+    web_app = app["web_app"]
+    uvicorn_config = uvicorn.Config(
+        web_app, host="0.0.0.0", port=web_port,
+        log_level="info", access_log=False,
+    )
+    uvicorn_server = uvicorn.Server(uvicorn_config)
+    app["uvicorn_server"] = uvicorn_server
+    web_task = asyncio.create_task(uvicorn_server.serve())
+    logger.info(f"Web API started on port {web_port}")
+
+    # Start Telegram transport
     await transport.start()
-    logger.info("Neura v2 running. Press Ctrl+C to stop.")
+    logger.info("Neura v2 running (Telegram + Web). Press Ctrl+C to stop.")
 
     await stop_event.wait()
 
     # Shutdown
+    uvicorn_server.should_exit = True
+    await web_task
     await shutdown(app)
 
 

@@ -1,0 +1,44 @@
+{
+  "groups": [
+    {
+      "name": "Dmitry HQ",
+      "group_id": -1003417427556,
+      "bot_token": "8674618358:AAHINXfvxnungqyUnmNwh8UEIPKjBaDnifY",
+      "updates_topic_id": 865,
+      "enabled": true,
+      "note": "Наша внутренняя HQ-группа"
+    },
+    {
+      "name": "Victoria HQ",
+      "group_id": -1003899251313,
+      "bot_token": "8784440703:AAH6ZLZ9Xup8jQAwu6DArTA0ZcYqT7ZpPY4",
+      "updates_topic_id": 450,
+      "enabled": true,
+      "note": "Виктория Сель — бот @victoria_sel_ai_bot"
+    },
+    {
+      "name": "Marina HQ",
+      "group_id": -1003870857965,
+      "bot_token": "8733145434:AAFy4ra7BFJUhWyCfC1xhydfBdTg2PF98oM",
+      "updates_topic_id": 249,
+      "enabled": true,
+      "note": "Марина Бирюкова — бот @nagrada_ai_bot"
+    },
+    {
+      "name": "Yulia HQ",
+      "group_id": -1003755942047,
+      "bot_token": "8516660050:AAHf0P5xFgm_z8iUZwg9_LAIRzM3uBdOMng",
+      "updates_topic_id": 13,
+      "enabled": true,
+      "note": "Юлия Гудымо — @yulia_g_ai_bot, топик '📦 Обновления' id=13"
+    },
+    {
+      "name": "Maxim HQ",
+      "group_id": -1003806649394,
+      "bot_token": "8744810699:AAFao8AuGbb5ZePueoVmtDH23gySMBWorF8",
+      "updates_topic_id": 276,
+      "enabled": true,
+      "note": "Максим Белоусов — бот @X1000AI_bot. Отправка через Bot API (сервер не трогаем)"
+    }
+  ]
+}

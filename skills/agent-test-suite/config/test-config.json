@@ -1,0 +1,59 @@
+{
+  "timeouts": {
+    "L2_simple": 90,
+    "L2_long": 180,
+    "L2_file": 300
+  },
+  "limits": {
+    "max_parallel_L2": 1,
+    "max_diary_files": 200,
+    "max_sessions_size_mb": 5,
+    "max_memory_mb": 500,
+    "disk_warning_percent": 85
+  },
+  "scoring": {
+    "skip_penalty_threshold": 0.3,
+    "critical_max_grade": "B",
+    "grades": {
+      "A+": [95, 100],
+      "A": [85, 94],
+      "B": [70, 84],
+      "C": [50, 69],
+      "D": [0, 49]
+    }
+  },
+  "categories": {
+    "INFRA": {"name": "Инфраструктура", "level": "L0-L1"},
+    "MSG": {"name": "Базовый messaging", "level": "L2"},
+    "FILE": {"name": "Файлы и документы", "level": "L0-L2"},
+    "MEM": {"name": "Память и дневник", "level": "L0-L1"},
+    "SKILL": {"name": "Скиллы", "level": "L0-L1"},
+    "INTG": {"name": "Интеграции", "level": "L0-L2"},
+    "MEDIA": {"name": "Голос и медиа", "level": "L0-L2"},
+    "UX": {"name": "UX и интерфейс", "level": "L0-L2"},
+    "SEC": {"name": "Безопасность", "level": "L0-L1"},
+    "PERF": {"name": "Производительность", "level": "L1"},
+    "MULTI": {"name": "Мульти-пользователь", "level": "L0-L2"},
+    "CROSS": {"name": "Cross-capsule", "level": "L0"}
+  },
+  "capability_requirements": {
+    "INTG-01": "google",
+    "INTG-02": "google",
+    "INTG-03": "icalendar",
+    "INTG-04": "bitrix",
+    "INTG-05": "bitrix",
+    "INTG-06": "vk",
+    "INTG-07": "vk",
+    "INTG-08": "userbot",
+    "INTG-09": "userbot",
+    "INTG-10": "mail",
+    "MEDIA-04": "tts",
+    "FILE-06": "image_gen",
+    "MULTI-01": "multi_user",
+    "MULTI-02": "multi_user",
+    "MULTI-03": "multi_user",
+    "MULTI-04": "multi_user"
+  },
+  "registry_path": "/opt/neura-admin/capsule-registry.json",
+  "registry_fallback": ".agent/skills/capsule-audit/config/capsule-profiles.json"
+}

@@ -1,0 +1,17 @@
+{
+  "dimensions": {
+    "technical":    {"weight": 0.25, "label": "Technical (Lighthouse)"},
+    "visual":       {"weight": 0.15, "label": "Visual / Design"},
+    "copywriting":  {"weight": 0.20, "label": "Copywriting"},
+    "marketing":    {"weight": 0.15, "label": "Marketing / Psychology"},
+    "seo":          {"weight": 0.15, "label": "SEO"},
+    "performance":  {"weight": 0.10, "label": "Performance Budget"}
+  },
+  "grades": {
+    "A": [90, 100],
+    "B": [80, 89],
+    "C": [70, 79],
+    "D": [55, 69],
+    "F": [0, 54]
+  }
+}

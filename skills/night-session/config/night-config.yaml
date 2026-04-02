@@ -1,0 +1,92 @@
+# Night Orchestrator v2 — Configuration
+# Запуск: python3 scripts/night-orchestrator.py
+# Systemd timer: 20:00 UTC (03:00 NSK)
+
+orchestrator:
+  # Рабочее окно (UTC)
+  window_start_utc: "20:00"
+  window_end_utc: "06:00"
+  # Слоты
+  slot_minutes: 30
+  # Максимум задач за сессию
+  max_tasks: 60
+  # Параллельные агенты
+  max_workers: 3
+  # Таймаут одной задачи (секунды)
+  task_timeout: 2400  # 40 мин
+  # Max turns для claude -p
+  max_turns: 50
+  # Рабочая директория
+  workdir: "/root/Antigravity"
+  # Путь к claude CLI
+  claude_bin: "/usr/bin/claude"
+  # Лог-директория
+  log_dir: "/root/Antigravity/logs/night"
+  # Sandbox: изоляция задач в git worktree (safe mode)
+  sandbox_mode: true
+
+auth:
+  # Проверка авторизации перед стартом
+  retries: 3
+  retry_delay_seconds: 300  # 5 мин между попытками
+  # Тестовая команда для проверки auth
+  test_prompt: "echo OK"
+
+hq:
+  bot_token: "8674618358:AAHINXfvxnungqyUnmNwh8UEIPKjBaDnifY"
+  group_id: -1003417427556
+  threads:
+    night: 962
+    infra: 8
+    notes: 9
+  # Retry для Telegram API
+  api_retries: 3
+  api_retry_delay: 5  # секунды, с экспоненциальным backoff
+
+tasks:
+  # Источники задач
+  night_tasks_file: "NIGHT_TASKS.md"
+  handoff_file: "HANDOFF.md"
+  # Файл очереди (генерируется night-tasks-generator.py)
+  queue_file: "/tmp/night-queue.json"
+  # Шаблоны задач
+  templates_file: ".agent/skills/night-session/config/task-templates.yaml"
+
+validation:
+  # Проверки после выполнения задачи
+  checks:
+    - file_exists       # файл создан
+    - file_min_size     # не пустой (>100 bytes)
+    - file_modified     # изменён за последние N мин
+  # Минимальный размер файла (bytes)
+  min_file_size: 100
+  # Окно модификации (секунды)
+  modification_window: 3600  # 1 час
+  # Retry при провале валидации
+  retry_on_fail: true
+  max_retries: 1
+  # Semantic validation: Claude оценивает результат 1-10
+  semantic_validation: true
+  semantic_min_score: 5
+
+resilience:
+  # Circuit breaker: после N подряд ошибок — пауза
+  circuit_breaker_threshold: 3
+  circuit_breaker_cooldown: 900  # 15 минут
+  # Resource guard
+  disk_threshold_pct: 90
+  memory_threshold_pct: 85
+
+safety:
+  # Запрещённые серверы
+  prohibited_servers:
+    - "45.11.93.179"
+  # Запрещённые действия
+  prohibited_actions:
+    - "git push"
+    - "git push --force"
+    - "sshpass"
+  # Не отправлять сообщения клиентам
+  no_client_messages: true
+  # Не трогать бот Максима
+  no_maxim_bot: true

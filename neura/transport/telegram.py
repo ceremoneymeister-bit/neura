@@ -128,11 +128,14 @@ class TelegramTransport:
     """Multi-bot Telegram transport. One process, all capsules."""
 
     def __init__(self, capsules: dict[str, Capsule], engine: ClaudeEngine,
-                 memory: MemoryStore, queue: RequestQueue):
+                 memory: MemoryStore, queue: RequestQueue,
+                 metrics=None, alert_sender=None):
         self._capsules = capsules
         self._engine = engine
         self._memory = memory
         self._queue = queue
+        self._metrics = metrics
+        self._alert_sender = alert_sender
         self._apps: list[Application] = []
         self._token_to_capsule: dict[str, Capsule] = {}
 
@@ -209,7 +212,11 @@ class TelegramTransport:
             return
 
         if capsule.is_trial_expired():
-            await msg.reply_text("⏰ Пробный период завершён. Свяжитесь с администратором.")
+            expired_msg = capsule.config.trial.get(
+                "expired_message",
+                "⏰ Пробный период завершён. Свяжитесь с администратором.",
+            )
+            await msg.reply_text(expired_msg)
             return
 
         cap_id = capsule.config.id
@@ -254,6 +261,14 @@ class TelegramTransport:
             return
 
         cap_id = capsule.config.id
+
+        # BTW queue check (same as text handler)
+        if await self._queue.is_processing(cap_id):
+            count = await self._queue.add_btw(
+                cap_id, QueuedMessage(text="[Голосовое сообщение — ожидает обработки]", timestamp=_time.time()))
+            await msg.reply_text(f"📎 Принято (+{count}), обработаю после текущего запроса")
+            return
+
         max_per_day = capsule.config.rate_limit.get("max_per_day", 100)
         rl = await self._queue.check_rate_limit(cap_id, max_per_day)
         if rl == "blocked":
@@ -366,7 +381,29 @@ class TelegramTransport:
             return
 
         caption = msg.caption or f"Обработай этот документ: {filename}"
-        prompt = f"Пользователь отправил документ {filename}: {tmp_path}\n\nЗадача: {caption}"
+
+        # Extract text via markitdown (DOCX, XLSX, PPTX, HTML, TXT, CSV)
+        # PDF goes directly to Claude CLI (native Read tool support)
+        extracted_text = None
+        ext_lower = ext.lower()
+        if ext_lower not in (".pdf",):
+            try:
+                from markitdown import MarkItDown
+                md_converter = MarkItDown()
+                result = md_converter.convert(tmp_path)
+                extracted_text = result.text_content
+                logger.info(f"markitdown extracted: {len(extracted_text)} chars from {filename}")
+            except Exception as e:
+                logger.warning(f"markitdown failed for {filename}: {e}")
+
+        if extracted_text:
+            if len(extracted_text) > 50000:
+                extracted_text = extracted_text[:50000] + "\n\n... (документ обрезан, слишком большой)"
+            prompt = (f"Пользователь отправил документ {filename}.\n\n"
+                      f"Содержимое документа:\n\n{extracted_text}\n\n"
+                      f"Задача: {caption}")
+        else:
+            prompt = f"Пользователь отправил документ {filename}: {tmp_path}\n\nЗадача: {caption}"
 
         incoming = IncomingMessage(
             capsule_id=capsule.config.id,
@@ -388,6 +425,7 @@ class TelegramTransport:
         """Core pipeline: context → stream → parse → send → diary → BTW flush."""
         cap_id = capsule.config.id
         await self._queue.set_processing(cap_id, True)
+        start_time = _time.monotonic()
 
         accumulated_text = ""
         tools_used: list[str] = []
@@ -420,6 +458,13 @@ class TelegramTransport:
 
             logger.info(f"[{cap_id}] Stream done: {chunk_count} chunks, {len(accumulated_text)} chars")
 
+            # 2b. Guard against empty response
+            if not accumulated_text.strip():
+                logger.warning(f"[{cap_id}] Empty response (0 chars). Notifying user.")
+                await responder.finalize(None)
+                await msg.reply_text("⚠️ Не удалось получить ответ. Попробуйте ещё раз.")
+                return
+
             # 3. Parse response
             response = ResponseParser.parse(accumulated_text)
 
@@ -446,14 +491,30 @@ class TelegramTransport:
             # 9. Rate counter
             await self._queue.increment_rate(cap_id)
 
+            # 10. Metrics (success)
+            if self._metrics:
+                duration = _time.monotonic() - start_time
+                await self._metrics.record_request(cap_id, duration, success=True)
+
         except Exception as e:
             logger.error(f"Processing error for {cap_id}: {e}", exc_info=True)
+            # Metrics (error)
+            if self._metrics:
+                duration = _time.monotonic() - start_time
+                await self._metrics.record_request(cap_id, duration, success=False,
+                                                   error_type="EXCEPTION")
+            # Alert
+            if self._alert_sender:
+                await self._alert_sender.send(
+                    f"{cap_id}: {type(e).__name__}: {e}",
+                    alert_type="CAPSULE_ERROR",
+                    capsule_id=cap_id,
+                )
             try:
                 await msg.reply_text("Техническая ошибка. Попробуйте ещё раз.")
             except Exception:
                 pass
         finally:
-            await self._queue.set_processing(cap_id, False)
             # Cleanup temp file
             if incoming.file_path:
                 try:
@@ -461,8 +522,16 @@ class TelegramTransport:
                 except Exception:
                     pass
 
-        # 9. BTW follow-up
-        btw_messages = await self._queue.flush_btw(cap_id)
+            # BTW follow-up (INSIDE lock to prevent race condition)
+            try:
+                btw_messages = await self._queue.flush_btw(cap_id)
+            except Exception:
+                btw_messages = []
+
+            # Release lock AFTER BTW flush
+            await self._queue.set_processing(cap_id, False)
+
+        # Process BTW follow-up outside lock
         if btw_messages:
             combined = "\n\n".join(m.text for m in btw_messages)
             follow_up = IncomingMessage(

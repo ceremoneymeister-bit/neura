@@ -1,0 +1,267 @@
+{
+  "categories": {
+    "health": {
+      "label": "Health (Infrastructure)",
+      "layer": 2,
+      "tests": [
+        {
+          "id": "H-01",
+          "name": "Сервис запущен",
+          "check": "service_active",
+          "description": "systemctl is-active / docker ps / ssh systemctl"
+        },
+        {
+          "id": "H-02",
+          "name": "Нет свежих ошибок",
+          "check": "recent_errors",
+          "description": "journalctl/docker logs за 10 мин, grep ERROR/CRITICAL/Traceback",
+          "window_minutes": 10
+        },
+        {
+          "id": "H-03",
+          "name": "sessions.json валиден",
+          "check": "sessions_valid",
+          "description": "JSON-парсинг без ошибок, структура корректна"
+        },
+        {
+          "id": "H-04",
+          "name": "Нет зомби-процессов claude",
+          "check": "zombie_claude",
+          "description": "ps -eo pid,etimes,args | grep claude — процессы >10 мин"
+        },
+        {
+          "id": "H-05",
+          "name": "Память в норме",
+          "check": "memory_usage",
+          "description": "cgroup MemoryMax / docker stats < 90%",
+          "threshold_percent": 90
+        },
+        {
+          "id": "H-06",
+          "name": "Диск не переполнен",
+          "check": "disk_usage",
+          "description": "df -h / < 90%",
+          "threshold_percent": 90
+        },
+        {
+          "id": "H-07",
+          "name": "Бот-токен валиден",
+          "check": "bot_token_valid",
+          "description": "getMe API call"
+        },
+        {
+          "id": "H-08",
+          "name": "Сессии не перегружены",
+          "check": "sessions_overloaded",
+          "description": "Нет топиков с >80 сообщений",
+          "max_messages": 80
+        }
+      ]
+    },
+    "messaging": {
+      "label": "Messaging (Functional)",
+      "layer": 1,
+      "tests": [
+        {
+          "id": "M-01",
+          "name": "Простой ответ",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Тест связи. Сколько будет 2+2? Ответь одним числом.",
+          "expect": "non_empty",
+          "timeout": 90
+        },
+        {
+          "id": "M-02",
+          "name": "Персистентность",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Прибавь 10 к предыдущему результату.",
+          "expect": "contains_any:12,14",
+          "timeout": 90,
+          "depends_on": "M-01"
+        },
+        {
+          "id": "M-03",
+          "name": "Длинный ответ",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Напиши 30 кратких советов по продуктивности, каждый одним предложением.",
+          "expect": "long_or_telegraph",
+          "min_length": 500,
+          "timeout": 180
+        },
+        {
+          "id": "M-04",
+          "name": "Скилл-роутинг",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Создай PDF-документ со списком из 5 задач на сегодня.",
+          "expect": "has_file",
+          "timeout": 300
+        },
+        {
+          "id": "M-05",
+          "name": "Восстановление после cancel",
+          "check": "cancel_and_recover",
+          "messages": ["/cancel", "[AUDIT] Привет, как дела?"],
+          "expect": "non_empty",
+          "timeout": 90
+        }
+      ]
+    },
+    "files": {
+      "label": "Files (Functional)",
+      "layer": 1,
+      "tests": [
+        {
+          "id": "F-01",
+          "name": "Приём текстового файла",
+          "check": "send_file_and_wait",
+          "file_content": "Список покупок:\n1. Молоко\n2. Хлеб\n3. Яблоки",
+          "file_name": "audit_test.txt",
+          "message": "[AUDIT] Что в этом файле? Перечисли пункты.",
+          "expect": "contains_any:молоко,хлеб,яблоки",
+          "timeout": 120
+        },
+        {
+          "id": "F-02",
+          "name": "Приём изображения",
+          "check": "send_photo_and_wait",
+          "message": "[AUDIT] Опиши что на этом изображении.",
+          "expect": "non_empty",
+          "timeout": 120
+        },
+        {
+          "id": "F-03",
+          "name": "Генерация PDF",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Создай PDF-документ: 'Тестовый отчёт аудита' с 3 пунктами.",
+          "expect": "has_file",
+          "timeout": 300
+        }
+      ]
+    },
+    "integrations": {
+      "label": "Integrations (Functional)",
+      "layer": 1,
+      "tests": [
+        {
+          "id": "I-01",
+          "name": "Парсинг канала",
+          "check": "send_and_wait",
+          "requires_capability": "userbot",
+          "message": "[AUDIT] Прочитай последний пост из @durov",
+          "expect": "non_empty",
+          "timeout": 120
+        },
+        {
+          "id": "I-02",
+          "name": "Календарь",
+          "check": "send_and_wait",
+          "requires_capability": "icalendar",
+          "message": "[AUDIT] Что у меня в календаре на сегодня?",
+          "expect": "non_empty",
+          "timeout": 120
+        },
+        {
+          "id": "I-03",
+          "name": "VK-статус",
+          "check": "send_and_wait",
+          "requires_capability": "vk",
+          "message": "[AUDIT] Покажи статус VK-интеграции.",
+          "expect": "non_empty",
+          "timeout": 60
+        },
+        {
+          "id": "I-04",
+          "name": "Bitrix24",
+          "check": "send_and_wait",
+          "requires_capability": "bitrix",
+          "message": "[AUDIT] Покажи статус CRM Bitrix24.",
+          "expect": "non_empty",
+          "timeout": 60
+        },
+        {
+          "id": "I-05",
+          "name": "Google",
+          "check": "send_and_wait",
+          "requires_capability": "google",
+          "message": "[AUDIT] Покажи статус Google-интеграции.",
+          "expect": "non_empty",
+          "timeout": 60
+        }
+      ]
+    },
+    "personalization": {
+      "label": "Memory & Personalization",
+      "layer": 2,
+      "tests": [
+        {
+          "id": "P-01",
+          "name": "Дневник существует",
+          "check": "diary_exists",
+          "description": "diary/ содержит файл за последние 3 дня"
+        },
+        {
+          "id": "P-02",
+          "name": "Learnings валидны",
+          "check": "file_valid",
+          "file": "memory/learnings.md",
+          "max_entries": 50
+        },
+        {
+          "id": "P-03",
+          "name": "Corrections валидны",
+          "check": "file_valid",
+          "file": "memory/corrections.md",
+          "max_entries": 50
+        },
+        {
+          "id": "P-04",
+          "name": "Контекст-осведомлённость",
+          "check": "send_and_wait",
+          "message": "[AUDIT] Что ты знаешь обо мне? Кратко, 2-3 факта.",
+          "expect": "not_contains:не знаю,нет информации",
+          "timeout": 90
+        }
+      ]
+    },
+    "cross_capsule": {
+      "label": "Cross-Capsule Consistency",
+      "layer": 2,
+      "tests": [
+        {
+          "id": "X-01",
+          "name": "execute_always_deep сигнатура",
+          "check": "function_signature",
+          "function": "execute_always_deep",
+          "description": "Одинаковая сигнатура во всех ботах"
+        },
+        {
+          "id": "X-02",
+          "name": "Маркеры поддержаны",
+          "check": "code_contains",
+          "patterns": ["[FILE:", "[LEARN:", "[CORRECTION:"],
+          "description": "Все маркеры обрабатываются в коде бота"
+        },
+        {
+          "id": "X-03",
+          "name": "Telegraph обработка",
+          "check": "code_contains",
+          "patterns": ["telegraph", "telegra.ph"],
+          "description": "Обработка длинных ответов >4000 символов"
+        },
+        {
+          "id": "X-04",
+          "name": "CLAUDE.md изоляция",
+          "check": "file_exists",
+          "file": "CLAUDE.md",
+          "description": "Каждая капсула имеет свой CLAUDE.md"
+        },
+        {
+          "id": "X-05",
+          "name": "Формат сессий",
+          "check": "sessions_schema",
+          "description": "sessions.json одинаковая структура"
+        }
+      ]
+    }
+  }
+}

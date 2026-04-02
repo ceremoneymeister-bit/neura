@@ -1,0 +1,74 @@
+{
+  "channels": [
+    {
+      "name": "Несерьёзный айтишник",
+      "channel_id": "UCqib0rC7oNo4dXr0RpbtYRg",
+      "tg_channel": null,
+      "tags": ["claude-code", "AI", "курсы"],
+      "priority": "high"
+    },
+    {
+      "name": "ИИздец",
+      "channel_id": "UCjtTkXEapjlgCNsD9s0RwWA",
+      "tg_channel": "-1002458113351",
+      "tags": ["n8n", "AI-агенты", "шаблоны"],
+      "priority": "high"
+    },
+    {
+      "name": "ИИшенка | AI Automation",
+      "channel_id": "UCq_L4pHHIuWBW6OSKKxBbgw",
+      "tg_channel": "-1002643494761",
+      "tags": ["автоматизация", "документы", "AI-агенты"],
+      "priority": "high"
+    },
+    {
+      "name": "Алексей Орфеев | Архитектор ИИ",
+      "channel_id": "UCSFNvPPUBn4KOteRF3Nbd7Q",
+      "tg_channel": "-1002011947245",
+      "tags": ["AI", "автоматизации", "vibe-coding"],
+      "priority": "medium"
+    },
+    {
+      "name": "Никита Велс",
+      "channel_id": "UCgFaudM5mLnF4ixj6qeRhPQ",
+      "tg_channel": "-1002546853359",
+      "tags": ["claude-code", "AI-агенты", "antigravity"],
+      "priority": "high"
+    },
+    {
+      "name": "Влад Воронежцев | Нейросети",
+      "channel_id": "UC797Sd_fYNILYZFuXsjjFDA",
+      "tg_channel": "-1002214268216",
+      "tags": ["нейросети", "дизайн", "AI"],
+      "priority": "medium"
+    },
+    {
+      "name": "Михаил Тимочко",
+      "channel_id": "UCudUZhJR8BUTiJ_njlAqr_w",
+      "tg_channel": null,
+      "tags": ["AI", "нейросети", "контент", "reels"],
+      "priority": "medium"
+    },
+    {
+      "name": "Михаил Дашкиев",
+      "channel_id": "UCm1ieqG5y44v0QVeMeGQycg",
+      "tg_channel": null,
+      "tags": ["бизнес", "предпринимательство", "стратегия"],
+      "priority": "medium"
+    },
+    {
+      "name": "Маргулан Сейсембай",
+      "channel_id": "UCTHXtr2FZibOytQV7Yt7FqA",
+      "tg_channel": null,
+      "tags": ["бизнес", "стратегия", "инвестиции", "AI"],
+      "priority": "medium"
+    }
+  ],
+  "relevance_keywords": [
+    "claude", "claude code", "anthropic", "AI агент", "AI-агент",
+    "n8n", "автоматизация", "telegram бот", "MCP", "agentic",
+    "antigravity", "neura", "продюсер", "AI продажи",
+    "промпт", "cursor", "windsurf", "vibe coding",
+    "API", "интеграция", "SaaS", "подписка", "монетизация"
+  ]
+}

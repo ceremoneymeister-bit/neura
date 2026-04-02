@@ -23,6 +23,7 @@ DEFAULT_TOOLS = ["Read", "Glob", "Grep", "Write", "Edit", "WebSearch", "WebFetch
 DEFAULT_MEMORY = {"diary_retention_days": 90, "max_long_term_entries": 100,
                   "context_window": {"today_diary": 10, "recent_days": 3}}
 DEFAULT_RATE_LIMIT = {"max_per_day": 100, "warn_at": 50}
+DEFAULT_HOMES_DIR = str(Path(__file__).resolve().parent.parent.parent / "homes")
 
 REQUIRED_FIELDS = ["id", "name"]
 REQUIRED_NESTED = {
@@ -128,7 +129,7 @@ class Capsule:
             memory=data.get("memory", dict(DEFAULT_MEMORY)),
             rate_limit=data.get("rate_limit", dict(DEFAULT_RATE_LIMIT)),
             trial=data.get("trial", {"enabled": False}),
-            home_dir=f"/tmp/claude-homes/{data['id']}",
+            home_dir=str(Path(os.environ.get("NEURA_HOMES_DIR", DEFAULT_HOMES_DIR)) / data["id"]),
         )
 
         logger.info(f"Loaded capsule: {cfg.id} ({cfg.name})")
@@ -149,11 +150,14 @@ class Capsule:
 
     def get_engine_config(self) -> EngineConfig:
         """Convert capsule config to EngineConfig for ClaudeEngine."""
+        # Skills table is attached by app.py after loading
+        skills_prompt = getattr(self, "_skills_table", "")
         return EngineConfig(
             model=self.config.model,
             effort=self.config.effort,
             allowed_tools=list(self.config.allowed_tools),
             home_dir=self.config.home_dir,
+            append_system_prompt=skills_prompt,
         )
 
     def is_employee(self, telegram_id: int) -> bool:
@@ -166,12 +170,18 @@ class Capsule:
         )
 
     def get_system_prompt(self) -> str:
-        """Read SYSTEM.md file for this capsule."""
+        """Read SYSTEM.md file for this capsule.
+
+        Replaces ${NEURA_BASE} with the actual project root path,
+        making SYSTEM.md portable across servers.
+        """
         if not self.config.system_prompt_path:
             return ""
         prompt_path = self._config_dir / self.config.system_prompt_path
         if prompt_path.exists():
-            return prompt_path.read_text(encoding="utf-8").strip()
+            base_dir = str(Path(__file__).resolve().parent.parent.parent)
+            text = prompt_path.read_text(encoding="utf-8").strip()
+            return text.replace("${NEURA_BASE}", base_dir)
         logger.warning(f"System prompt not found: {prompt_path}")
         return ""
 

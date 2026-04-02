@@ -4,9 +4,12 @@ Skills are directories containing SKILL.md with YAML frontmatter.
 Each capsule references skills by name in its YAML config.
 """
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+
+DEFAULT_SKILLS_DIR = str(Path(__file__).resolve().parent.parent.parent / "skills")
 
 import yaml
 
@@ -57,8 +60,10 @@ def _extract_triggers(text: str) -> str:
 class SkillRegistry:
     """Scans skill directories, caches metadata, provides lookup."""
 
-    def __init__(self, skills_dir: str = ".agent/skills"):
-        self._skills_dir = Path(skills_dir)
+    def __init__(self, skills_dir: str | None = None):
+        self._skills_dir = Path(
+            skills_dir or os.environ.get("NEURA_SKILLS_DIR", DEFAULT_SKILLS_DIR)
+        )
         self._skills: dict[str, SkillInfo] = {}
 
     def scan(self) -> None:

@@ -164,6 +164,7 @@ class ClaudeEngine:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                cwd=cfg.home_dir if cfg.home_dir else None,
             )
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 proc.communicate(), timeout=cfg.timeout
@@ -214,6 +215,8 @@ class ClaudeEngine:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            cwd=cfg.home_dir if cfg.home_dir else None,
+            limit=2 * 1024 * 1024,  # 2MB buffer (default 64KB too small for doc analysis)
         )
 
         try:
@@ -236,7 +239,15 @@ class ClaudeEngine:
         except asyncio.TimeoutError:
             proc.kill()
             yield Chunk(type="error", text="⏱ Таймаут.")
+        except asyncio.CancelledError:
+            proc.kill()
+            yield Chunk(type="error", text="⚠️ Запрос отменён.")
         finally:
+            if proc.returncode is None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
             try:
                 await proc.wait()
             except Exception:
@@ -250,10 +261,11 @@ class ClaudeEngine:
 
 
 def _kill_orphaned_claude():
-    """Kill hanging claude processes."""
+    """Kill hanging claude processes spawned by THIS service only."""
+    my_pid = os.getpid()
     try:
         result = subprocess.run(
-            ["pgrep", "-af", "claude.*-p"],
+            ["pgrep", "-af", "--parent", str(my_pid), "claude"],
             capture_output=True, text=True, timeout=5,
         )
         for line in result.stdout.strip().split("\n"):
@@ -262,7 +274,7 @@ def _kill_orphaned_claude():
             pid = line.split()[0]
             try:
                 os.kill(int(pid), 9)
-                logger.info(f"Killed orphaned claude process {pid}")
+                logger.info(f"Killed orphaned claude process {pid} (child of {my_pid})")
             except (ProcessLookupError, ValueError):
                 pass
     except Exception:

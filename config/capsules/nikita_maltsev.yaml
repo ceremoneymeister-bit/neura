@@ -1,0 +1,86 @@
+id: nikita_maltsev
+name: Нейра — AI-ассистент
+owner:
+  name: Никита Мальцев
+  telegram_id: 107365522
+telegram:
+  bot_token: ${NIKITA_BOT_TOKEN}
+  features:
+    streaming: true
+    voice_input: true
+    file_tools: true
+    proactive: false
+    btw_queue: true
+claude:
+  model: sonnet
+  effort: standard
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+  - Edit
+  - WebSearch
+  - WebFetch
+  - Bash(python3|ls|mkdir|cat)
+  system_prompt: nikita_maltsev/SYSTEM.md
+skills:
+- copywriting
+- smart-response
+- russian-typography
+- headline-lab
+- notion-pdf
+- word-docx
+- excel-xlsx
+- ppt-generator
+- pdf-generator
+- content-creator
+- social-content
+- carousel-creator
+- brand-voice-clone
+- marketing-psychology
+- seo-audit
+- brainstorming
+- decision-lab
+- market-research
+- auto-funnel
+- warmup-constructor
+- webinar-script
+- quiz-funnel
+- product-ladder
+- launch-system
+- landing-page
+- landing-audit
+- nano-banana-pro
+- image-processing
+- yandex-zen
+- youtube-monitor
+- vk-community
+- google-oauth
+- bitrix24-agent
+- course-platform-builder
+- telegram-bot-builder
+- skill-creator
+memory:
+  diary_retention_days: 90
+  max_long_term_entries: 100
+  context_window:
+    today_diary: 10
+    recent_days: 3
+    recent_per_day: 10
+    learnings_chars: 3000
+    corrections_chars: 3000
+employees: []
+rate_limit:
+  max_per_day: 100
+  warn_at: 80
+trial:
+  enabled: true
+  days: 5
+  expired_message: '⏰ Ваш 5-дневный пробный период завершён.
+
+
+    Если хотите продолжить работу с AI-ассистентом — свяжитесь с Дмитрием: @ceremoneymeister
+
+
+    Спасибо, что попробовали Нейру! 🙏'

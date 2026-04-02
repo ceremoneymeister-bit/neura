@@ -32,5 +32,24 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
+  # Web frontend (nginx serving built React SPA + reverse proxy to backend)
+  # Build: cd web && npm run build  (produces web/dist/)
+  # Start: docker compose up web
+  web:
+    image: nginx:alpine
+    container_name: neura-web
+    volumes:
+      - ./web/dist:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    mem_limit: 64m
+    # neura-backend is the main neura-v2 service (add it manually when integrating web.py)
+    # links: [neura-backend]
+
 volumes:
   pgdata:

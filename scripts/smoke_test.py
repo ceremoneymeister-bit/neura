@@ -30,7 +30,7 @@ async def main():
 
     results = []
     config_dir = str(Path(__file__).parent.parent / "config" / "capsules")
-    skills_dir = "/root/Antigravity/.agent/skills"
+    skills_dir = str(Path(__file__).parent.parent / "skills")
 
     print(f"\n🧪 Neura v2 Smoke Test — capsule: {args.capsule}\n")
 
