@@ -129,7 +129,9 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         if not cap:
             return
         from neura.core.engine import EngineConfig
-        from neura.core.context import ContextBuilder, ContextParts
+        from neura.core.context import ContextBuilder
+        from neura.core.memory import DiaryEntry
+        from datetime import datetime as _dt, timezone as _tz
 
         try:
             # Build context with diary/memory
@@ -137,8 +139,13 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
             builder = ContextBuilder(cap)
             full_prompt = builder.build(prompt, parts, is_first_message=True)
 
-            cfg = EngineConfig(capsule_id=capsule_id)
-            result = await engine.run(full_prompt, cfg)
+            cfg = EngineConfig(capsule_id=capsule_id, home_dir=cap.config.home_dir)
+            # Collect streaming output into a single result
+            result_parts = []
+            async for chunk in engine.stream(full_prompt, cfg):
+                if chunk.text:
+                    result_parts.append(chunk.text)
+            result = "".join(result_parts)
 
             # Send result via bot
             from telegram import Bot
@@ -150,11 +157,19 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
                 await bot.shutdown()
 
             # Write diary
-            await memory.add_diary(capsule_id, prompt, result[:500])
+            now = _dt.now(_tz.utc)
+            entry = DiaryEntry(
+                capsule_id=capsule_id,
+                date=now.strftime("%Y-%m-%d"),
+                time=now.strftime("%H:%M:%S"),
+                source="heartbeat",
+                user_message=f"[Автозадача] {prompt[:300]}",
+                bot_response=result[:500],
+            )
+            await memory.add_diary(entry)
             logger.info(f"Heartbeat task done: {capsule_id}, {len(result)} chars")
         except Exception as e:
             logger.error(f"Heartbeat task failed {capsule_id}: {e}", exc_info=True)
-            # Notify user about failure
             from telegram import Bot
             bot = Bot(token=cap.config.bot_token)
             try:
