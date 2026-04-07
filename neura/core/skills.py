@@ -1,5 +1,11 @@
 """Skill loader + registry — scans SKILL.md files, provides skill info.
 
+@arch scope=platform  affects=all_capsules(14), proactive_engine
+@arch depends=filesystem (/opt/neura-v2/skills/*/SKILL.md)
+@arch risk=MEDIUM  restart=neura-v2
+@arch role=Parses SKILL.md frontmatter, caches metadata, provides lookup + proactive triggers.
+@arch note=Default dir: /opt/neura-v2/skills/. Capsules symlink from homes/*/skills/.
+
 Skills are directories containing SKILL.md with YAML frontmatter.
 Each capsule references skills by name in its YAML config.
 """
@@ -27,6 +33,16 @@ class SkillInfo:
     triggers: str = ""
     version: str = ""
     tags: list[str] = field(default_factory=list)
+    # Proactive config (flat format from frontmatter)
+    proactive_enabled: bool = False
+    proactive_triggers: list[dict] = field(default_factory=list)
+    # Learning config
+    learning_track_success: bool = False
+    learning_track_corrections: bool = False
+    learning_evolve_threshold: int = 5
+    # Usage stats (populated at runtime)
+    usage_count: int = 0
+    maturity: str = "seed"
 
 
 def _parse_frontmatter(text: str) -> dict:
@@ -78,6 +94,18 @@ class SkillRegistry:
                 content = skill_md.read_text(encoding="utf-8")
                 meta = _parse_frontmatter(content)
                 name = meta.get("name", skill_md.parent.name)
+                # Parse proactive triggers from flat frontmatter
+                proactive_triggers = []
+                for i in range(1, 5):
+                    t_type = meta.get(f"proactive_trigger_{i}_type")
+                    t_cond = meta.get(f"proactive_trigger_{i}_condition")
+                    t_act = meta.get(f"proactive_trigger_{i}_action")
+                    if t_type and t_cond:
+                        proactive_triggers.append({
+                            "type": t_type, "condition": t_cond,
+                            "action": t_act or "",
+                        })
+
                 self._skills[name] = SkillInfo(
                     name=name,
                     description=meta.get("description", ""),
@@ -85,6 +113,13 @@ class SkillRegistry:
                     triggers=_extract_triggers(content),
                     version=meta.get("version", ""),
                     tags=meta.get("tags", []),
+                    proactive_enabled=bool(meta.get("proactive_enabled", False)),
+                    proactive_triggers=proactive_triggers,
+                    learning_track_success=bool(meta.get("learning_track_success", False)),
+                    learning_track_corrections=bool(meta.get("learning_track_corrections", False)),
+                    learning_evolve_threshold=int(meta.get("learning_evolve_threshold", 5)),
+                    usage_count=int(meta.get("usage_count", 0)),
+                    maturity=meta.get("maturity", "seed"),
                 )
             except Exception as e:
                 logger.error(f"Failed to parse skill {skill_md}: {e}")
@@ -105,6 +140,14 @@ class SkillRegistry:
             else:
                 logger.warning(f"Skill '{name}' not found in registry")
         return result
+
+    def get_proactive_skills(self) -> list[SkillInfo]:
+        """Get all skills with proactive triggers enabled."""
+        return [s for s in self._skills.values() if s.proactive_enabled and s.proactive_triggers]
+
+    def all_skill_names(self) -> list[str]:
+        """Get all registered skill names."""
+        return list(self._skills.keys())
 
     def format_table(self, skills: list[SkillInfo]) -> str:
         """Generate Markdown table for prompt injection."""

@@ -1,6 +1,14 @@
 ---
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "задача для параллельных агентов"
+proactive_trigger_1_action: "распределить по субагентам"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Dispatching Parallel Agents
@@ -178,3 +186,9 @@ From debugging session (2025-10-03):
 - All investigations completed concurrently
 - All fixes integrated successfully
 - Zero conflicts between agent changes
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

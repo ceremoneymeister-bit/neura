@@ -1,6 +1,14 @@
 ---
 name: image-processing
 description: "Use when working with images — optimization, resizing, compression, format conversion, social media sizes, web images, 'оптимизируй картинку', 'размер для Instagram', alt-text, favicon"
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "изображение нужно оптимизировать"
+proactive_trigger_1_action: "ресайз, сжатие, WebP"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Image Processing — работа с изображениями
@@ -183,3 +191,9 @@ for p in Path('.').glob('*.jpg'):
 ```
 [FILE:/tmp/optimized-image.webp]
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

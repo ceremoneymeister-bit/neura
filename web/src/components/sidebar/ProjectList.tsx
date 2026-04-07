@@ -12,12 +12,14 @@ import {
   updateProject,
 } from '@/api/projects'
 import { type Conversation } from '@/api/conversations'
+import { ProjectIcon } from '@/components/ui/NeuraIcon'
 
 interface ProjectListProps {
   projects: Project[]
   conversations: Conversation[]
   activeId?: string
   onNavigate: (id: number) => void
+  onProjectNavigate?: (projectId: number) => void
   onReload: () => void
 }
 
@@ -26,6 +28,7 @@ export function ProjectList({
   conversations,
   activeId,
   onNavigate,
+  onProjectNavigate,
   onReload,
 }: ProjectListProps) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -45,6 +48,20 @@ export function ProjectList({
   useEffect(() => {
     if (editingId !== null) editRef.current?.focus()
   }, [editingId])
+
+  // Auto-expand project containing active conversation
+  useEffect(() => {
+    if (!activeId) return
+    const activeConv = conversations.find((c) => String(c.id) === activeId)
+    if (activeConv?.project_id) {
+      setExpanded((prev) => {
+        if (prev.has(activeConv.project_id!)) return prev
+        const next = new Set(prev)
+        next.add(activeConv.project_id!)
+        return next
+      })
+    }
+  }, [activeId, conversations])
 
   const toggle = (id: number) =>
     setExpanded((prev) => {
@@ -113,13 +130,13 @@ export function ProjectList({
     <div className="mt-2">
       {/* Section header */}
       <div className="flex items-center px-2 mb-1">
-        <p className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-[#525252]">
-          📁 Проекты
+        <p className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+          <ProjectIcon size={11} /> Проекты
         </p>
         <button
           onClick={() => setCreating(true)}
           title="Создать проект"
-          className="text-[#525252] hover:text-[#a3a3a3] transition-colors p-0.5"
+          className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-0.5"
         >
           <Plus size={12} />
         </button>
@@ -135,7 +152,7 @@ export function ProjectList({
             onKeyDown={handleCreateKey}
             onBlur={handleCreate}
             placeholder="Название проекта"
-            className="flex-1 h-6 px-2 rounded-[4px] bg-[#1a1a1a] border border-[#7c3aed]/50 text-xs text-[#f5f5f5] placeholder-[#525252] focus:outline-none"
+            className="flex-1 h-6 px-2 rounded-lg bg-[var(--bg-hover)] border border-[var(--accent)]/50 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none"
           />
           <button
             onMouseDown={(e) => e.preventDefault()}
@@ -147,7 +164,7 @@ export function ProjectList({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { setCreating(false); setNewName('') }}
-            className="text-[#525252] hover:text-red-400 transition-colors"
+            className="text-[var(--text-muted)] hover:text-red-400 transition-colors"
           >
             <X size={12} />
           </button>
@@ -165,19 +182,19 @@ export function ProjectList({
           <div key={p.id}>
             {/* Project header row */}
             <div
-              className="group flex items-center gap-1 px-1 py-1 rounded-[6px] hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+              className="group flex items-center gap-1 px-1 py-1 rounded-lg hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
             >
               {/* Expand toggle */}
               <button
                 onClick={() => toggle(p.id)}
-                className="text-[#525252] hover:text-[#a3a3a3] flex-shrink-0 p-0.5 transition-colors"
+                className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0 p-0.5 transition-colors"
               >
                 {isOpen
                   ? <ChevronDown size={11} />
                   : <ChevronRight size={11} />}
               </button>
 
-              <span className="text-sm flex-shrink-0 leading-none">{p.icon}</span>
+              <span className="flex-shrink-0 leading-none"><ProjectIcon size={14} /></span>
 
               {/* Name or inline edit */}
               {isEditing ? (
@@ -187,13 +204,13 @@ export function ProjectList({
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={handleEditKey}
                   onBlur={commitEdit}
-                  className="flex-1 h-5 px-1 rounded bg-[#1a1a1a] border border-[#7c3aed]/50 text-xs text-[#f5f5f5] focus:outline-none"
+                  className="flex-1 h-5 px-1 rounded bg-[var(--bg-hover)] border border-[var(--accent)]/50 text-xs text-[var(--text-primary)] focus:outline-none"
                 />
               ) : (
                 <button
-                  onClick={() => toggle(p.id)}
+                  onClick={() => onProjectNavigate ? onProjectNavigate(p.id) : toggle(p.id)}
                   onDoubleClick={() => startEdit(p)}
-                  className="flex-1 text-left text-xs text-[#a3a3a3] group-hover:text-[#f5f5f5] truncate transition-colors"
+                  className="flex-1 text-left text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate transition-colors"
                 >
                   {p.name}
                 </button>
@@ -201,25 +218,25 @@ export function ProjectList({
 
               {/* Chats count badge */}
               {!isEditing && convs.length > 0 && (
-                <span className="text-[10px] text-[#525252] group-hover:opacity-0 transition-opacity ml-1">
+                <span className="text-[10px] text-[var(--text-muted)] group-hover:opacity-0 transition-opacity ml-1">
                   {convs.length}
                 </span>
               )}
 
               {/* Action buttons (hover) */}
               {!isEditing && !isDeleting && (
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
+                <div className="hover-hide flex items-center gap-0.5 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); startEdit(p) }}
                     title="Переименовать"
-                    className="p-0.5 text-[#525252] hover:text-[#a3a3a3] transition-colors"
+                    className="p-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
                   >
                     <Pencil size={10} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeletingId(p.id) }}
                     title="Удалить"
-                    className="p-0.5 text-[#525252] hover:text-red-400 transition-colors"
+                    className="p-0.5 text-[var(--text-muted)] hover:text-red-400 transition-colors"
                   >
                     <Trash2 size={10} />
                   </button>
@@ -229,7 +246,7 @@ export function ProjectList({
 
             {/* Delete confirmation */}
             {isDeleting && (
-              <div className="mx-2 mb-1 px-2 py-1.5 rounded-[6px] bg-red-500/10 border border-red-500/20">
+              <div className="mx-2 mb-1 px-2 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
                 <p className="text-[10px] text-red-400 mb-1.5">
                   Удалить «{p.name}»? Чаты останутся.
                 </p>
@@ -242,7 +259,7 @@ export function ProjectList({
                   </button>
                   <button
                     onClick={() => setDeletingId(null)}
-                    className="text-[10px] text-[#525252] hover:text-[#a3a3a3] transition-colors"
+                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
                   >
                     Отмена
                   </button>
@@ -252,9 +269,9 @@ export function ProjectList({
 
             {/* Conversations inside project */}
             {isOpen && (
-              <div className="ml-5 border-l border-[#262626] pl-1.5 mb-0.5">
+              <div className="ml-5 border-l border-[var(--border)] pl-1.5 mb-0.5">
                 {convs.length === 0 ? (
-                  <p className="text-[10px] text-[#525252] py-1 px-1">Нет чатов</p>
+                  <p className="text-[10px] text-[var(--text-muted)] py-1 px-1">Нет чатов</p>
                 ) : (
                   convs.map((c) => {
                     const isActive = String(c.id) === activeId
@@ -263,10 +280,10 @@ export function ProjectList({
                         key={c.id}
                         onClick={() => onNavigate(c.id)}
                         className={[
-                          'w-full text-left px-2 py-1 rounded-[4px] text-xs truncate transition-colors',
+                          'w-full text-left px-2 py-1 rounded-lg text-xs truncate transition-colors',
                           isActive
-                            ? 'bg-[#7c3aed]/15 text-[#f5f5f5] border-l-2 border-[#7c3aed]'
-                            : 'text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#f5f5f5]',
+                            ? 'bg-[var(--accent)]/15 text-[var(--text-primary)] border-l-2 border-[var(--accent)]'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
                         ].join(' ')}
                       >
                         {c.title}
@@ -284,7 +301,7 @@ export function ProjectList({
       {projects.length === 0 && !creating && (
         <button
           onClick={() => setCreating(true)}
-          className="w-full text-left px-2 py-1 text-[10px] text-[#525252] hover:text-[#a3a3a3] transition-colors"
+          className="w-full text-left px-2 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
         >
           + Создать первый проект
         </button>

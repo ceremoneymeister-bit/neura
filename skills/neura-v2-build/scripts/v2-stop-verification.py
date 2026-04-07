@@ -11,8 +11,8 @@ import time
 
 MARKER = "/tmp/.neura-v2-stop-checked"
 COOLDOWN_SEC = 120
-V2_DIR = "/opt/neura-v2"
-PROGRESS_FILE = "/root/Antigravity/docs/neura-v2/PROGRESS.md"
+V2_DIR = os.environ.get("NEURA_BASE", "/opt/neura-v2")
+PROGRESS_FILE = os.path.join(V2_DIR, "docs", "PROGRESS.md")
 
 def main():
     # Skip in capsule context

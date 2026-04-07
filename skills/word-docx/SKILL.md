@@ -1,6 +1,14 @@
 ---
 name: word-docx
 description: "Use when creating or editing Word documents (.docx) — КП, договоры, отчёты, документы, 'создай документ', 'сделай Word', 'docx'"
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужен Word документ"
+proactive_trigger_1_action: "сгенерировать DOCX"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Word / DOCX — работа с документами
@@ -167,3 +175,16 @@ doc.save(f'/tmp/Договор_{client_name}.docx')
 - Нужна вёрстка/дизайн → PDF через weasyprint
 - Совместное редактирование → Google Docs
 - Таблицы с формулами → Excel/Google Sheets
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+- 2026-04-07: 7 использований, success rate 100.0%, avg latency 30.0s
+- 2026-04-07: 6 использований, success rate 100.0%, avg latency 28.8s
+- 2026-04-07: 5 использований, success rate 100.0%, avg latency 30.4s

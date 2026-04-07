@@ -1,6 +1,14 @@
 ---
 name: executing-plans
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "план создан"
+proactive_trigger_1_action: "выполнение по шагам"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Executing Plans
@@ -82,3 +90,9 @@ After all tasks complete and verified:
 - **superpowers:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
 - **superpowers:writing-plans** - Creates the plan this skill executes
 - **superpowers:finishing-a-development-branch** - Complete development after all tasks
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

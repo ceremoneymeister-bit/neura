@@ -7,6 +7,17 @@ description: >
   сценарий бесплатного мастеркласса и 30-дневный контент-календарь.
 risk: low
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "среда"
+proactive_trigger_1_action: "маркетинговый контент для школы"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "набор новой группы"
+proactive_trigger_2_action: "запустить воронку"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Synapse Marketing
@@ -272,3 +283,9 @@ source: internal
 Маркетинговые фреймворки в этом скилле основаны на:
 - **НЕЧ20 (ConversionArt)** — продуктовая матрица, воронки, квиз-архитектура, декомпозиция целей, лид-магниты
 - **Пыриков (TG-запуски)** — 17-шаговый фреймворк запуска
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

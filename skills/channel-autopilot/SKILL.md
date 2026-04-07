@@ -9,6 +9,14 @@ category: content
 tags: [telegram, autoposting, channel, content, ai-news, rewrite, images, strategy, warming, engagement]
 risk: low
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "ежедневно 09:00"
+proactive_trigger_1_action: "генерация и постинг AI-дайджеста"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # channel-autopilot
@@ -623,3 +631,9 @@ Scored 0.922 на 22.03 (232 views, 37 reactions) — ВЫСШИЙ скор за
 - `scripts/tg-channel.py` — публикация/расписание (Telethon, main session)
 - `.agent/skills/night-session/config/task-templates.yaml` — шаблон ночной задачи
 - `.agent/skills/notion-pdf/` — генерация PDF-отчётов для HQ
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

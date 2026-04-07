@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><style>
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DejaVu Sans', system-ui, sans-serif; color: #1a1a2e; line-height: 1.7; font-size: 12px; }
+
+/* === HERO === */
+.hero {
+    background: linear-gradient(135deg, {{dark}} 0%, {{brand}} 60%, {{accent}} 100%);
+    color: white; padding: 55px 55px 45px; position: relative;
+}
+.hero::after {
+    content: ""; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 4px; background: linear-gradient(90deg, {{accent}}, {{brand}});
+}
+.hero .logo { font-size: 11px; opacity: 0.6; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+.hero h1 { font-size: 30px; letter-spacing: -0.5px; margin-bottom: 8px; }
+.hero .sub { font-size: 14px; opacity: 0.85; font-weight: 300; }
+.hero .for { margin-top: 20px; font-size: 12px; opacity: 0.7; }
+
+/* === BODY === */
+.body { padding: 35px 55px; }
+h2 { color: {{brand}}; font-size: 17px; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 2px solid {{brand}}; }
+h3 { font-size: 14px; color: #34495e; margin: 16px 0 8px; }
+p { color: #444; margin: 0 0 14px; }
+
+/* === INTRO CARD === */
+.intro {
+    background: linear-gradient(135deg, #f8f7ff 0%, #f0eeff 100%);
+    border-left: 4px solid {{brand}}; padding: 20px 24px;
+    border-radius: 0 12px 12px 0; margin: 20px 0; font-size: 13px; color: #333;
+}
+
+/* === PRICE HIGHLIGHT === */
+.price-box {
+    background: linear-gradient(135deg, {{brand}} 0%, {{dark}} 100%);
+    color: white; padding: 32px; border-radius: 16px; margin: 24px 0; text-align: center;
+}
+.price-box .amount { font-size: 40px; font-weight: bold; margin-bottom: 6px; }
+.price-box .label { font-size: 14px; opacity: 0.85; }
+.price-box .note { font-size: 11px; opacity: 0.6; margin-top: 8px; }
+
+/* === TABLE === */
+table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+thead tr { background: linear-gradient(135deg, {{brand}} 0%, {{dark}} 100%); }
+th { color: white; padding: 13px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+td { padding: 11px 16px; border-bottom: 1px solid #f0f0f0; font-size: 12px; color: #333; }
+tbody tr:nth-child(even) { background: #fafafe; }
+tbody tr:last-child td { border-bottom: none; }
+
+/* === CHECKLIST === */
+.check-list { list-style: none; padding: 0; margin: 16px 0; }
+.check-list li { padding: 10px 0 10px 32px; position: relative; border-bottom: 1px solid #f0f0f0; }
+.check-list li::before { content: "\2713"; position: absolute; left: 6px; color: {{accent}}; font-weight: bold; font-size: 14px; }
+.check-list li:last-child { border-bottom: none; }
+
+/* === COLUMNS === */
+.columns { display: flex; gap: 16px; margin: 16px 0; }
+.col { flex: 1; background: #f9f9fd; padding: 20px; border-radius: 12px; border-top: 3px solid {{brand}}; }
+.col h3 { margin: 0 0 8px; color: {{brand}}; }
+.col p { font-size: 11px; margin: 0; color: #555; }
+
+/* === STEPS === */
+.steps { counter-reset: step; margin: 16px 0; }
+.step { display: flex; align-items: flex-start; margin: 12px 0; }
+.step-num { counter-increment: step; min-width: 36px; height: 36px; background: {{brand}}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; margin-right: 14px; flex-shrink: 0; }
+.step-text h3 { margin: 0 0 4px; font-size: 13px; }
+.step-text p { margin: 0; font-size: 11px; color: #666; }
+
+/* === CTA === */
+.cta {
+    background: {{accent}}; color: {{dark}}; padding: 20px 30px;
+    border-radius: 12px; margin: 24px 0; text-align: center; font-size: 14px; font-weight: 600;
+}
+.cta .small { font-size: 11px; font-weight: 400; margin-top: 6px; opacity: 0.7; }
+
+/* === QUOTE === */
+blockquote { border-left: 4px solid {{accent}}; padding: 14px 20px; color: #555; background: #f8fffe; border-radius: 0 8px 8px 0; margin: 16px 0; font-style: italic; }
+.quote-author { font-style: normal; font-size: 11px; color: {{brand}}; margin-top: 6px; }
+
+/* === FOOTER === */
+.footer {
+    background: {{dark}}; color: white; padding: 22px 55px; font-size: 11px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: fixed; bottom: 0; left: 0; right: 0;
+}
+.footer .copy { opacity: 0.6; }
+
+/* === DIVIDER === */
+hr { border: none; height: 1px; background: linear-gradient(90deg, transparent, {{brand}}40, transparent); margin: 28px 0; }
+</style></head><body>
+
+<div class="hero">
+    <div class="logo">{{logo}}</div>
+    <h1>{{title}}</h1>
+    <div class="sub">{{subtitle}}</div>
+    <div class="for">Подготовлено для: {{client}}</div>
+</div>
+
+<div class="body">
+{{content}}
+</div>
+
+<div class="footer">
+    <div>{{author}}</div>
+    <div class="copy">{{date}}</div>
+</div>
+
+</body></html>

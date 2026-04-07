@@ -3,7 +3,7 @@
 
 Источники:
   1. journalctl (systemd services: victoria-bot, nagrada-bot, cm-listener, etc.)
-  2. Cron logs (/root/Antigravity/logs/*.log, /tmp/*.log)
+  2. Cron logs (${NEURA_BASE}/logs/*.log, /tmp/*.log)
   3. Docker logs (yulia-gudymo-bot)
   4. Claude CLI stderr (если пишется в лог)
 
@@ -42,11 +42,12 @@ DOCKER_CONTAINERS = [
     "yulia-gudymo-bot",
 ]
 
+_BASE = os.environ.get("NEURA_BASE", "/opt/neura-v2")
 CRON_LOGS = [
-    "/root/Antigravity/logs/reminders.log",
-    "/root/Antigravity/logs/tasks-sync.log",
-    "/root/Antigravity/logs/autopilot.log",
-    "/root/Antigravity/logs/google-oauth-reminder.log",
+    f"{_BASE}/logs/reminders.log",
+    f"{_BASE}/logs/tasks-sync.log",
+    f"{_BASE}/logs/autopilot.log",
+    f"{_BASE}/logs/google-oauth-reminder.log",
 ]
 
 TMP_LOGS = [

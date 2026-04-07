@@ -9,6 +9,17 @@ category: education
 tags: [education, children, ai-thinking, curriculum, lesson-plan, synapse]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "планирование занятий"
+proactive_trigger_1_action: "предложить модули и проекты"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "воскресенье"
+proactive_trigger_2_action: "план занятий на неделю"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # synapse-curriculum
@@ -100,3 +111,9 @@ source: internal
 | `references/tool-matrix.md` | 19 AI-платформ: возраст, модуль, сложность, доступ |
 | `references/assessment-rubric.md` | Система оценки прогресса учеников (1–5) |
 | `references/project-catalog.md` | 30+ проектов по возрасту, интересам, сложности |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -13,6 +13,17 @@ last_used: 2026-04-01
 created: 2026-04-01
 updated: 2026-04-01
 created_from: НЕЧ20 — Автоворонки (Продуктовая матрица + Техническая реализация) + OTO unit
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый продукт/запуск"
+proactive_trigger_1_action: "предложить воронку продаж"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "понедельник"
+proactive_trigger_2_action: "проверить метрики воронки"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # auto-funnel
@@ -307,3 +318,9 @@ OTO-1 -> OTO-2 -> OTO-3 (бесконечное количество). При о
 - НЕЧ20: Автоворонка. Техническая реализация
 - НЕЧ20: unit-otov16 (One-Time Offer)
 - Ryan Deiss: "когда вы сможете получать покупателей на точке безубыточности, все остальное пойдет прямо вам в карман"
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

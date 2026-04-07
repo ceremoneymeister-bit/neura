@@ -152,6 +152,28 @@ class TestResponseParserFiles:
         result = ResponseParser.parse("[FILE:/tmp/a.pdf] text [FILE:/tmp/b.jpg]")
         assert len(result.files) == 2
 
+    def test_homes_dir_allowed_by_default(self):
+        """Files in /opt/neura-v2/homes/ should be allowed (DEFAULT_ALLOWED_PREFIXES)."""
+        from neura.transport.protocol import ResponseParser
+        result = ResponseParser.parse("[FILE:/opt/neura-v2/homes/dmitry_test/report.pdf]")
+        assert len(result.files) == 1
+        assert result.files[0].filename == "report.pdf"
+
+    def test_homes_dir_allowed_via_explicit_prefix(self):
+        """Files in capsule home_dir should be allowed when passed explicitly."""
+        from neura.transport.protocol import ResponseParser
+        result = ResponseParser.parse(
+            "[FILE:/opt/neura-v2/homes/test_capsule/doc.docx]",
+            allowed_prefixes=["/tmp/", "/opt/neura-v2/homes/test_capsule/"],
+        )
+        assert len(result.files) == 1
+
+    def test_xlsx_caption(self):
+        from neura.transport.protocol import ResponseParser
+        result = ResponseParser.parse("[FILE:/tmp/data.xlsx]")
+        assert len(result.files) == 1
+        assert result.files[0].filename == "data.xlsx"
+
 
 class TestResponseParserLongText:
     def test_short_text_not_long(self):

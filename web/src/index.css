@@ -1,44 +1,100 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
-/* ── Neura Design System ──────────────────────────────────── */
-:root {
-  --bg-primary: #0a0a0a;
-  --bg-sidebar: #141414;
-  --bg-card: #141414;
-  --bg-input: #1e1e1e;
-  --bg-hover: #1a1a1a;
+/* ── Neura Design System ── */
+
+/* Dark theme (default) */
+:root, [data-theme="dark"] {
+  --bg-primary: #252523;
+  --bg-sidebar: #2f2f2d;
+  --bg-card: #1f1e1d;
+  --bg-input: #1f1e1d;
+  --bg-hover: #2c2c2a;
 
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-muted: rgba(124, 58, 237, 0.15);
+  --accent-light: #a78bfa;
   --accent-gradient: linear-gradient(135deg, #7c3aed, #a78bfa);
   --accent-glow: 0 0 20px rgba(124, 58, 237, 0.3);
 
-  --text-primary: #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --text-muted: #525252;
+  --text-primary: #faf9f5;
+  --text-secondary: #c1bfb5;
+  --text-muted: #9b9991;
 
-  --border: #262626;
+  --border: rgba(225, 224, 217, 0.08);
   --border-focus: #7c3aed;
 
+  --brand-clay: #d87756;
+  --code-inline: #e879f9;
+
+  --skeleton-from: #1f1e1d;
+  --skeleton-via: #2c2c2a;
+
+  --scrollbar-thumb: rgba(155, 153, 145, 0.2);
+  --scrollbar-thumb-hover: rgba(155, 153, 145, 0.35);
+  --selection-bg: rgba(124, 58, 237, 0.3);
+  --glass-bg: rgba(37, 37, 35, 0.8);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  --font-serif: 'Lora', Georgia, serif;
   --transition: 150ms ease;
+
+  color-scheme: dark;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #faf9f7;
+  --bg-sidebar: #f0efec;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #eae9e5;
+
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-muted: rgba(124, 58, 237, 0.08);
+  --accent-light: #7c3aed;
+  --accent-gradient: linear-gradient(135deg, #7c3aed, #a78bfa);
+  --accent-glow: 0 0 20px rgba(124, 58, 237, 0.15);
+
+  --text-primary: #1a1a18;
+  --text-secondary: #4a4a45;
+  --text-muted: #8a8a82;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-focus: #7c3aed;
+
+  --brand-clay: #c4633e;
+  --code-inline: #9333ea;
+
+  --skeleton-from: #eae9e5;
+  --skeleton-via: #f5f4f1;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.22);
+  --selection-bg: rgba(124, 58, 237, 0.15);
+  --glass-bg: rgba(250, 249, 247, 0.85);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+
+  color-scheme: light;
 }
 
 @theme {
-  --color-bg-primary: #0a0a0a;
-  --color-bg-sidebar: #141414;
-  --color-bg-card: #141414;
-  --color-bg-input: #1e1e1e;
-  --color-bg-hover: #1a1a1a;
+  --color-bg-primary: #252523;
+  --color-bg-sidebar: #2f2f2d;
+  --color-bg-card: #1f1e1d;
+  --color-bg-input: #1f1e1d;
+  --color-bg-hover: #2c2c2a;
   --color-accent: #7c3aed;
   --color-accent-hover: #6d28d9;
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-muted: #525252;
-  --color-border: #262626;
+  --color-text-primary: #faf9f5;
+  --color-text-secondary: #c1bfb5;
+  --color-text-muted: #9b9991;
+  --color-border: rgba(225, 224, 217, 0.08);
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Lora', Georgia, serif;
 }
 
 * {
@@ -55,6 +111,7 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   height: 100%;
   margin: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {
@@ -70,25 +127,31 @@ html, body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 51, 51, 0.4);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
   transition: background 200ms;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Selection */
 ::selection {
-  background: rgba(124, 58, 237, 0.3);
+  background: var(--selection-bg);
   color: var(--text-primary);
 }
 
-/* Focus ring */
+/* Focus ring — only on interactive elements, not on textareas/inputs inside containers */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   box-shadow: var(--accent-glow);
+}
+
+textarea:focus-visible,
+.no-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 /* Animations */
@@ -124,17 +187,18 @@ html, body {
   100% { background-position: 0% 50%; }
 }
 
-.animate-fade-in    { animation: fade-in 200ms ease both; }
-.animate-slide-left { animation: slide-in-left 200ms ease both; }
-.cursor-blink       { animation: blink 1s step-end infinite; }
+/* Fix #31: Unified animation timing — 150ms standard, ease-out default */
+.animate-fade-in    { animation: fade-in 150ms ease-out both; }
+.animate-slide-left { animation: slide-in-left 150ms ease-out both; }
+.cursor-blink       { animation: blink 1.5s step-end infinite; }  /* Fix #32: sync with shimmer 1.5s */
 .pulse-ring         { animation: pulse-ring 1.5s ease-out infinite; }
 
 .skeleton {
   background: linear-gradient(
     90deg,
-    #1e1e1e 25%,
-    #2a2a2a 50%,
-    #1e1e1e 75%
+    var(--skeleton-from) 25%,
+    var(--skeleton-via) 50%,
+    var(--skeleton-from) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -153,13 +217,23 @@ html, body {
 }
 
 .glass {
-  background: rgba(20, 20, 20, 0.8);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .transition-smooth {
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide on hover-capable devices only — always visible on touch */
+@media (hover: hover) {
+  .hover-hide { opacity: 0; transition: opacity 150ms; }
+  .group:hover .hover-hide,
+  .group:focus-within .hover-hide { opacity: 1; }
+}
+@media (hover: none) {
+  .hover-hide { opacity: 0.7; }
 }
 
 /* highlight.js reset — keep our bg */
@@ -172,6 +246,8 @@ html, body {
 .prose-neura {
   line-height: 1.65;
   word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
 }
 .prose-neura > *:first-child { margin-top: 0 !important; }
 .prose-neura > *:last-child  { margin-bottom: 0 !important; }

@@ -125,7 +125,7 @@ templates:
     frequency: "weekly"
     estimated_minutes: 20
     prompt: |
-      Используй readonly Telethon сессию (/root/Antigravity/.secrets/telegram_userbot_readonly.session).
+      Используй readonly Telethon сессию (/opt/neura-v2/.secrets/telegram_userbot_readonly.session).
       Спарсить последние 20 постов из:
       - @AI_Handler — Claude Code tips, MCP, skills
       - @xor_journal — AI тренды, технологии

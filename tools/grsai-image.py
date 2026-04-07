@@ -48,7 +48,7 @@ MODELS = ["nano-banana-pro", "nano-banana-2", "nano-banana-fast", "nano-banana",
 COMPLETIONS_MODELS = {"gpt-image-1.5"}
 
 # Корень проекта
-PROJECT_ROOT = Path("/root/Antigravity")
+PROJECT_ROOT = Path(os.environ.get("NEURA_BASE", str(Path(__file__).resolve().parent.parent)))
 
 # Таймауты
 POLL_INTERVAL = 3

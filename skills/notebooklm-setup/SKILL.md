@@ -1,6 +1,14 @@
 ---
 name: notebooklm-setup
 description: Полная установка и настройка NotebookLM на любом Linux-сервере. Включает обход геоблока, авторизацию через noVNC, автодиагностику и обёртку CLI. Используй при запросах «установи NotebookLM», «подключи NotebookLM», «настрой NLM на сервере».
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "установка NotebookLM на новый сервер"
+proactive_trigger_1_action: "запустить setup workflow"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # NotebookLM Setup — установка на сервер с нуля
@@ -306,3 +314,9 @@ nlm download report ./competitor-analysis.md
 | Запросов в день | ~50 | больше | больше |
 | Источников на блокнот | 50 | 100 | 300 |
 | Генерация audio/video | Лимит | Расширенный | Расширенный |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

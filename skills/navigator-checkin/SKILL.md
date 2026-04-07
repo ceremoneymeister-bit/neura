@@ -1,6 +1,14 @@
 ---
 name: navigator-checkin
 description: "Распаковка текущего положения. Агент задаёт серию наводящих вопросов, чтобы определить где ты сейчас, что происходит, какой фокус. Результат фиксируется в navigator/POSITION.md и navigator/log/."
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "ежедневно 09:00"
+proactive_trigger_1_action: "утренний чекин: где я, что дальше"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Navigator Checkin — распаковка положения
@@ -49,3 +57,9 @@ description: "Распаковка текущего положения. Аген
 2. Добавь запись в `navigator/log/YYYY-MM.md`
 3. Если выявлены решения — предложи перейти в decision-lab
 4. Если изменились цели — предложи goals-review
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

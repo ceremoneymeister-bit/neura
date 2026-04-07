@@ -3,6 +3,14 @@ name: marketing-psychology
 description: "Apply behavioral science and mental models to marketing decisions, prioritized using a psychological leverage and feasibility scoring system."
 risk: unknown
 source: community
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "создание продающего контента"
+proactive_trigger_1_action: "предложить психологические приёмы"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 # Marketing Psychology & Mental Models
 
@@ -258,3 +266,9 @@ Before responding, confirm:
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

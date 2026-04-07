@@ -21,15 +21,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Optional
 
+try:
+    from neura.core.document_processor import build_file_context as build_doc_context
+except ImportError:
+    build_doc_context = None  # fallback to inline builder
+
 import uvicorn
 from fastapi import (
     Depends, FastAPI, HTTPException, Request, UploadFile, WebSocket,
     WebSocketDisconnect, status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, EmailStr, field_validator
 
+from neura.core.engine import EngineConfig
 from neura.transport.auth import (
     create_token, get_current_user, hash_password, verify_password,
 )
@@ -39,6 +45,181 @@ logger = logging.getLogger(__name__)
 # Upload directory
 UPLOAD_DIR = Path(os.environ.get("NEURA_UPLOAD_DIR", "/tmp/neura-uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Generated files directory (where Claude writes images/docs via tools)
+GENERATED_DIR = Path("/tmp")
+
+# Max concurrent streams per user
+MAX_CONCURRENT_STREAMS = 2
+
+
+import re as _re
+import yaml
+
+_FILE_MARKER_RE = _re.compile(r'\[FILE:(.*?)\]')
+
+# Retryable error patterns (network, rate limit, timeout — NOT auth or bad request)
+_RETRYABLE_PATTERNS = ["timeout", "rate limit", "overloaded", "connection", "ECONNRESET", "529", "503", "502"]
+
+def _is_retryable_error(error_text: str) -> bool:
+    lower = error_text.lower()
+    return any(p in lower for p in _RETRYABLE_PATTERNS)
+
+
+# ── Theme config loader ─────────────────────────────────────────
+
+_theme_cache: dict = {}
+_theme_mapping: dict | None = None
+
+
+def _load_theme(capsule_id: str | None) -> dict | None:
+    """Load theme config for capsule. Returns None for default theme."""
+    global _theme_cache, _theme_mapping
+
+    themes_dir = Path("/opt/neura-v2/config/themes")
+
+    # Load mapping if needed
+    if _theme_mapping is None:
+        mapping_file = themes_dir / "_mapping.yaml"
+        if mapping_file.exists():
+            with open(mapping_file) as f:
+                _theme_mapping = yaml.safe_load(f) or {}
+        else:
+            _theme_mapping = {}
+
+    # Get theme_id for this capsule
+    theme_id = _theme_mapping.get(capsule_id, "default") if capsule_id else "default"
+
+    if theme_id == "default":
+        return None  # Frontend uses built-in defaults
+
+    # Load theme config
+    if theme_id not in _theme_cache:
+        theme_file = themes_dir / f"{theme_id}.yaml"
+        if theme_file.exists():
+            with open(theme_file) as f:
+                _theme_cache[theme_id] = yaml.safe_load(f)
+        else:
+            return None
+
+    return _theme_cache.get(theme_id)
+
+
+def _clear_theme_cache():
+    """Clear cached theme data (call on reload/restart)."""
+    global _theme_cache, _theme_mapping
+    _theme_cache = {}
+    _theme_mapping = None
+
+
+def _process_file_markers(text: str) -> str:
+    """Replace [FILE:/path/to/file] markers with web-accessible URLs.
+
+    Images become markdown images, other files become download links.
+    """
+    IMAGE_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
+
+    def _replace(m):
+        fpath = m.group(1).strip()
+        p = Path(fpath)
+        if not p.exists():
+            return f"*(файл не найден: {p.name})*"
+        # Copy to uploads dir with unique name so it's servable
+        dest_name = f"{uuid.uuid4().hex}_{p.name}"
+        dest = UPLOAD_DIR / dest_name
+        import shutil
+        shutil.copy2(fpath, dest)
+        url = f"/api/files/serve/{dest_name}"
+        if p.suffix.lower() in IMAGE_EXTS:
+            return f"\n![{p.name}]({url})\n"
+        return f"\n[{p.name}]({url})\n"
+
+    return _FILE_MARKER_RE.sub(_replace, text)
+
+
+class StreamSession:
+    """A background streaming session, decoupled from WebSocket lifecycle.
+
+    Chunks are kept in memory for replay on reconnect.
+    Max 200 chunks retained (prevents memory leak on long streams).
+    Sessions auto-expire after 10 minutes of being done.
+    """
+
+    _MAX_CHUNKS = 200
+
+    def __init__(self, conv_id: int, user_id: int):
+        self.conv_id = conv_id
+        self.user_id = user_id
+        self.task: asyncio.Task | None = None
+        self.chunks: list[dict] = []
+        self.done = False
+        self.done_at: float = 0.0
+        self.final_chunk: dict | None = None
+        self.subscribers: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def broadcast(self, data: dict):
+        """Send to all connected subscribers, remove dead ones."""
+        if len(self.chunks) < self._MAX_CHUNKS:
+            self.chunks.append(data)
+        dead = set()
+        for ws in self.subscribers:
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.add(ws)
+        self.subscribers -= dead
+
+    def cancel(self):
+        if self.task and not self.task.done():
+            self.task.cancel()
+
+    @property
+    def expired(self) -> bool:
+        """Session is expired if done for >10 minutes."""
+        return self.done and self.done_at > 0 and (time.monotonic() - self.done_at) > 600
+
+
+class StreamManager:
+    """Manages background stream sessions per user."""
+
+    def __init__(self):
+        # user_id → {conv_id → StreamSession}
+        self._sessions: dict[int, dict[int, StreamSession]] = defaultdict(dict)
+
+    def get_session(self, user_id: int, conv_id: int) -> StreamSession | None:
+        return self._sessions.get(user_id, {}).get(conv_id)
+
+    def active_count(self, user_id: int) -> int:
+        return sum(1 for s in self._sessions.get(user_id, {}).values() if not s.done)
+
+    def active_sessions(self, user_id: int) -> list[StreamSession]:
+        return [s for s in self._sessions.get(user_id, {}).values() if not s.done]
+
+    def create_session(self, user_id: int, conv_id: int) -> StreamSession:
+        # Cleanup expired sessions first
+        self._cleanup()
+        session = StreamSession(conv_id, user_id)
+        self._sessions[user_id][conv_id] = session
+        return session
+
+    def _cleanup(self):
+        """Remove expired sessions to free memory."""
+        for uid in list(self._sessions):
+            expired = [cid for cid, s in self._sessions[uid].items() if s.expired]
+            for cid in expired:
+                del self._sessions[uid][cid]
+            if not self._sessions[uid]:
+                del self._sessions[uid]
+
+    def remove_session(self, user_id: int, conv_id: int):
+        sessions = self._sessions.get(user_id, {})
+        sessions.pop(conv_id, None)
+        # Cleanup old done sessions (keep last 5)
+        done_sessions = [(cid, s) for cid, s in sessions.items() if s.done]
+        if len(done_sessions) > 5:
+            for cid, _ in done_sessions[:-5]:
+                sessions.pop(cid, None)
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────
@@ -63,13 +244,18 @@ class LoginRequest(BaseModel):
 
 class ProjectCreate(BaseModel):
     name: str
-    icon: str = "📁"
+    icon: str = ""
+    description: str = ""
+    instructions: str = ""
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     pinned: Optional[bool] = None
     icon: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    links: Optional[list] = None
 
 
 class ConversationCreate(BaseModel):
@@ -128,10 +314,28 @@ def create_web_app(
         redoc_url=None,
     )
 
-    # CORS — allow frontend dev server
+    # Rate limiter (per-capsule, 8 req/min)
+    from neura.transport.rate_limit import RateLimiter
+    _rate_limiter = RateLimiter(window_sec=60, max_requests=8)
+
+    # Stream manager for background sessions
+    stream_mgr = StreamManager()
+
+    # Claude CLI session_id per conversation (conv_id → session_id)
+    # Enables --resume: continue existing session instead of starting fresh
+    _claude_sessions: dict[int, str] = {}
+    _CLAUDE_SESSIONS_MAX = 200
+
+    # CORS — whitelist production + local dev
+    _cors_origins = os.environ.get("NEURA_CORS_ORIGINS", "").strip()
+    _allowed_origins = (
+        [o.strip() for o in _cors_origins.split(",") if o.strip()]
+        if _cors_origins
+        else ["https://app.ceremoneymeister.ru", "http://localhost:5173", "http://localhost:4173"]
+    )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -250,6 +454,19 @@ def create_web_app(
         return {"user": _user_to_dict(row)}
 
     # ═══════════════════════════════════════════════════════════
+    # THEME
+    # ═══════════════════════════════════════════════════════════
+
+    @app.get("/api/theme")
+    async def get_theme(current_user: CurrentUser, request: Request):
+        """Return theme config for current user's capsule."""
+        capsule_id = current_user.get("capsule_id")
+        theme = _load_theme(capsule_id)
+        if theme is None:
+            return JSONResponse({"theme_id": "default"})
+        return JSONResponse(theme)
+
+    # ═══════════════════════════════════════════════════════════
     # PROJECTS
     # ═══════════════════════════════════════════════════════════
 
@@ -261,7 +478,7 @@ def create_web_app(
             raise HTTPException(500, "Database not available")
 
         rows = await p.fetch(
-            """SELECT pr.id, pr.name, pr.pinned, pr.icon, pr.sort_order, pr.created_at,
+            """SELECT pr.id, pr.name, pr.description, pr.instructions, pr.links, pr.pinned, pr.icon, pr.sort_order, pr.created_at,
                       COUNT(c.id)::int AS chats_count
                FROM projects pr
                LEFT JOIN conversations c ON c.project_id = pr.id
@@ -280,10 +497,10 @@ def create_web_app(
             raise HTTPException(500, "Database not available")
 
         row = await p.fetchrow(
-            """INSERT INTO projects (user_id, name, icon)
-               VALUES ($1, $2, $3)
-               RETURNING id, name, pinned, icon, sort_order, created_at""",
-            current_user["user_id"], body.name, body.icon,
+            """INSERT INTO projects (user_id, name, icon, description, instructions)
+               VALUES ($1, $2, $3, $4, $5)
+               RETURNING id, name, description, instructions, links, pinned, icon, sort_order, created_at""",
+            current_user["user_id"], body.name, body.icon, body.description, body.instructions,
         )
         return _project_to_dict(row)
 
@@ -311,6 +528,13 @@ def create_web_app(
             updates["pinned"] = body.pinned
         if body.icon is not None:
             updates["icon"] = body.icon
+        if body.description is not None:
+            updates["description"] = body.description
+        if body.instructions is not None:
+            updates["instructions"] = body.instructions
+        if body.links is not None:
+            import json as _json
+            updates["links"] = _json.dumps(body.links)
 
         if not updates:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "No fields to update")
@@ -320,7 +544,7 @@ def create_web_app(
         row = await p.fetchrow(
             f"""UPDATE projects SET {set_clause}
                 WHERE id = $1
-                RETURNING id, name, pinned, icon, sort_order, created_at""",
+                RETURNING id, name, description, instructions, links, pinned, icon, sort_order, created_at""",
             project_id, *values,
         )
         return _project_to_dict(row)
@@ -341,6 +565,202 @@ def create_web_app(
         if result == "DELETE 0":
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
 
+    @app.get("/api/projects/{project_id}")
+    async def get_project(
+        project_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """Get a single project with conversation count."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        row = await p.fetchrow(
+            """SELECT pr.id, pr.name, pr.description, pr.instructions, pr.links, pr.pinned, pr.icon, pr.sort_order, pr.created_at,
+                      COUNT(c.id)::int AS chats_count
+               FROM projects pr
+               LEFT JOIN conversations c ON c.project_id = pr.id
+               WHERE pr.id = $1 AND pr.user_id = $2
+               GROUP BY pr.id""",
+            project_id, current_user["user_id"],
+        )
+        if not row:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+        return _project_to_dict(row)
+
+    @app.get("/api/projects/{project_id}/conversations")
+    async def list_project_conversations(
+        project_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """List all conversations belonging to a project."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        proj = await p.fetchrow(
+            "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+            project_id, current_user["user_id"],
+        )
+        if not proj:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
+        rows = await p.fetch(
+            """SELECT c.id, c.title, c.project_id, c.pinned, c.created_at, c.updated_at,
+                      (SELECT content FROM messages m
+                       WHERE m.conversation_id = c.id
+                       ORDER BY m.created_at DESC LIMIT 1) AS last_message
+               FROM conversations c
+               WHERE c.project_id = $1 AND c.user_id = $2
+               ORDER BY c.pinned DESC, c.updated_at DESC""",
+            project_id, current_user["user_id"],
+        )
+        return [_conversation_to_dict(r) for r in rows]
+
+    @app.get("/api/projects/{project_id}/auto-context")
+    async def get_project_auto_context(
+        project_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """Generate auto-context from project chats: titles, message count, recent topics."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        proj = await p.fetchrow(
+            "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+            project_id, current_user["user_id"],
+        )
+        if not proj:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
+        # Chat summaries with message counts
+        chats = await p.fetch(
+            """SELECT c.id, c.title, c.updated_at,
+                      COUNT(m.id)::int AS message_count,
+                      (SELECT content FROM messages m2
+                       WHERE m2.conversation_id = c.id AND m2.role = 'user'
+                       ORDER BY m2.created_at DESC LIMIT 1) AS last_user_message
+               FROM conversations c
+               LEFT JOIN messages m ON m.conversation_id = c.id
+               WHERE c.project_id = $1 AND c.user_id = $2
+               GROUP BY c.id
+               ORDER BY c.updated_at DESC
+               LIMIT 20""",
+            project_id, current_user["user_id"],
+        )
+
+        # Extract URLs from recent messages
+        import re
+        url_pattern = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')
+        urls: list[dict] = []
+        seen_urls: set[str] = set()
+
+        recent_msgs = await p.fetch(
+            """SELECT m.content, m.created_at
+               FROM messages m
+               JOIN conversations c ON c.id = m.conversation_id
+               WHERE c.project_id = $1 AND c.user_id = $2
+               ORDER BY m.created_at DESC
+               LIMIT 100""",
+            project_id, current_user["user_id"],
+        )
+
+        for msg in recent_msgs:
+            for url in url_pattern.findall(msg["content"] or ""):
+                if url not in seen_urls and len(urls) < 20:
+                    seen_urls.add(url)
+                    urls.append({
+                        "url": url,
+                        "found_at": msg["created_at"].isoformat() if msg["created_at"] else None,
+                    })
+
+        return {
+            "chats": [
+                {
+                    "id": c["id"],
+                    "title": c["title"],
+                    "message_count": c["message_count"],
+                    "last_user_message": (c["last_user_message"] or "")[:200],
+                    "updated_at": c["updated_at"].isoformat() if c["updated_at"] else None,
+                }
+                for c in chats
+            ],
+            "auto_links": urls,
+            "total_messages": sum(c["message_count"] for c in chats),
+            "total_chats": len(chats),
+        }
+
+    @app.get("/api/projects/{project_id}/members")
+    async def list_project_members(
+        project_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """List members (capsules) of a project."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        proj = await p.fetchrow(
+            "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+            project_id, current_user["user_id"],
+        )
+        if not proj:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
+        rows = await p.fetch(
+            "SELECT id, capsule_id, role, added_at FROM project_members WHERE project_id = $1 ORDER BY added_at",
+            project_id,
+        )
+        return [
+            {"id": r["id"], "capsule_id": r["capsule_id"], "role": r["role"],
+             "added_at": r["added_at"].isoformat() if r["added_at"] else None}
+            for r in rows
+        ]
+
+    @app.post("/api/projects/{project_id}/members", status_code=201)
+    async def add_project_member(
+        project_id: int, body: dict, current_user: CurrentUser, request: Request,
+    ):
+        """Add a capsule to a project."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        proj = await p.fetchrow(
+            "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+            project_id, current_user["user_id"],
+        )
+        if not proj:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
+        capsule_id = body.get("capsule_id", "").strip()
+        role = body.get("role", "member")
+        if not capsule_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "capsule_id required")
+
+        row = await p.fetchrow(
+            """INSERT INTO project_members (project_id, capsule_id, role)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (project_id, capsule_id) DO UPDATE SET role = $3
+               RETURNING id, capsule_id, role, added_at""",
+            project_id, capsule_id, role,
+        )
+        return {"id": row["id"], "capsule_id": row["capsule_id"], "role": row["role"],
+                "added_at": row["added_at"].isoformat() if row["added_at"] else None}
+
+    @app.delete("/api/projects/{project_id}/members/{member_id}", status_code=204)
+    async def remove_project_member(
+        project_id: int, member_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """Remove a capsule from a project."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        await p.execute(
+            """DELETE FROM project_members
+               WHERE id = $1 AND project_id = $2
+               AND project_id IN (SELECT id FROM projects WHERE user_id = $3)""",
+            member_id, project_id, current_user["user_id"],
+        )
+
     # ═══════════════════════════════════════════════════════════
     # CONVERSATIONS
     # ═══════════════════════════════════════════════════════════
@@ -353,7 +773,7 @@ def create_web_app(
             raise HTTPException(500, "Database not available")
 
         rows = await p.fetch(
-            """SELECT c.id, c.title, c.project_id, c.pinned, c.created_at, c.updated_at,
+            """SELECT c.id, c.title, c.project_id, c.pinned, c.model, c.created_at, c.updated_at,
                       (SELECT content FROM messages m
                        WHERE m.conversation_id = c.id
                        ORDER BY m.created_at DESC LIMIT 1) AS last_message
@@ -377,7 +797,7 @@ def create_web_app(
         row = await p.fetchrow(
             """INSERT INTO conversations (user_id, project_id, title)
                VALUES ($1, $2, $3)
-               RETURNING id, title, project_id, pinned, created_at, updated_at""",
+               RETURNING id, title, project_id, pinned, model, created_at, updated_at""",
             current_user["user_id"], body.project_id, title,
         )
         return _conversation_to_dict(row)
@@ -415,7 +835,7 @@ def create_web_app(
         row = await p.fetchrow(
             f"""UPDATE conversations SET {set_clause}
                 WHERE id = $1
-                RETURNING id, title, project_id, pinned, created_at, updated_at""",
+                RETURNING id, title, project_id, pinned, model, created_at, updated_at""",
             conv_id, *values,
         )
         return _conversation_to_dict(row)
@@ -435,6 +855,8 @@ def create_web_app(
         )
         if result == "DELETE 0":
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+        # Clean up Claude CLI session for this conversation
+        _claude_sessions.pop(conv_id, None)
 
     @app.get("/api/conversations/{conv_id}/messages")
     async def get_messages(
@@ -472,7 +894,7 @@ def create_web_app(
         request: Request,
     ):
         """Upload a file. Returns path, filename, size."""
-        max_size = 10 * 1024 * 1024  # 10 MB
+        max_size = 100 * 1024 * 1024  # 100 MB
         content = await file.read()
         if len(content) > max_size:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large (max 10MB)")
@@ -499,8 +921,29 @@ def create_web_app(
         }
 
     # ═══════════════════════════════════════════════════════════
+    # FILE SERVE (generated images, documents)
+    # ═══════════════════════════════════════════════════════════
+
+    @app.get("/api/files/serve/{filename}")
+    async def serve_file(filename: str):
+        """Serve an uploaded or generated file."""
+        safe = Path(filename).name  # prevent path traversal
+        fpath = UPLOAD_DIR / safe
+        if not fpath.exists():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+        return FileResponse(fpath, filename=safe)
+
+    # ═══════════════════════════════════════════════════════════
     # HEALTH
     # ═══════════════════════════════════════════════════════════
+
+    @app.get("/mobile")
+    async def mobile_ui():
+        """Serve the Neura mobile HTML interface."""
+        mobile_path = Path("/opt/neura-v2/homes/maxim_belousov/neura-mobile.html")
+        if not mobile_path.exists():
+            raise HTTPException(404, "Mobile UI not found")
+        return FileResponse(mobile_path, media_type="text/html")
 
     @app.get("/api/health")
     async def health_check(request: Request):
@@ -533,15 +976,315 @@ def create_web_app(
                 "model": getattr(cap.config, "model", "sonnet"),
             }
 
+        # Collect real metrics from DB
+        requests_total = 0
+        errors_total = 0
+        avg_duration = 0.0
+        skills_list: list[str] = []
+
+        db_pool = request.app.state.db_pool
+        if db_pool and capsule_id:
+            try:
+                row = await db_pool.fetchrow(
+                    """SELECT
+                        COUNT(*) FILTER (WHERE role = 'assistant') AS req_total,
+                        COUNT(*) FILTER (WHERE role = 'assistant' AND content LIKE '%%ошибк%%') AS err_total,
+                        COALESCE(AVG(duration_sec) FILTER (WHERE role = 'assistant' AND duration_sec > 0), 0) AS avg_dur
+                    FROM messages m
+                    JOIN conversations c ON c.id = m.conversation_id
+                    WHERE c.user_id = (SELECT id FROM users WHERE capsule_id = $1 LIMIT 1)""",
+                    capsule_id,
+                )
+                if row:
+                    requests_total = row["req_total"] or 0
+                    errors_total = row["err_total"] or 0
+                    avg_duration = float(row["avg_dur"] or 0)
+            except Exception:
+                pass
+
+        if capsule_id and capsule_id in capsules:
+            cap = capsules[capsule_id]
+            skills_list = list(getattr(cap.config, "skills", []) or [])
+
+        # Calculate uptime
+        import psutil
+        try:
+            proc = psutil.Process()
+            uptime = time.monotonic() - proc.create_time() + time.time() - time.monotonic()
+            uptime_sec = round(time.time() - proc.create_time())
+        except Exception:
+            uptime_sec = 0
+
         return {
             "status": "online",
             "capsule": capsule_info,
-            "uptime_sec": 0,  # filled by integration layer
+            "uptime_sec": uptime_sec,
+            "requests_total": requests_total,
+            "errors_total": errors_total,
+            "avg_duration_sec": round(avg_duration, 1),
+            "skills": skills_list,
         }
 
     # ═══════════════════════════════════════════════════════════
     # WEBSOCKET — STREAMING CHAT
     # ═══════════════════════════════════════════════════════════
+
+    async def _run_stream(
+        session: StreamSession,
+        engine_obj, capsule, capsule_id: str,
+        user_text: str, engine_cfg, requested_model: str | None,
+        db_pool_ref, memory_ref, conv_id: int,
+        files: list[str] | None = None,
+    ):
+        """Background stream task — runs independently of WebSocket.
+
+        Session resume: if we have an active Claude CLI session_id for this
+        conversation, we --resume it instead of rebuilding full context.
+        """
+        import json as _json_mod
+        start_time = time.monotonic()
+        accumulated = ""
+        tools_used: list[str] = []
+        model_name = engine_cfg.model or "sonnet"
+        result_session_id = ""
+        had_error = False
+
+        # Build file context: append file paths so Claude can Read them
+        file_context = ""
+        if files:
+            file_lines = []
+            for fpath in files:
+                p = Path(fpath)
+                if not p.exists():
+                    continue
+                try:
+                    if build_doc_context is not None:
+                        line = build_doc_context(fpath)
+                    else:
+                        raise RuntimeError("document_processor not available")
+                    file_lines.append(line)
+                except Exception:
+                    # Fallback to simple context
+                    ext = p.suffix.lower()
+                    size_mb = p.stat().st_size / (1024 * 1024)
+                    size_str = f"{size_mb:.1f} МБ" if size_mb >= 1 else f"{p.stat().st_size / 1024:.0f} КБ"
+                    file_lines.append(f"[Файл: {p.name}, {size_str}] — прочитай через Read tool: {fpath}")
+            if file_lines:
+                file_context = "\n\nПользователь прикрепил файлы:\n" + "\n".join(file_lines)
+
+        try:
+            # Check for existing Claude CLI session for this conversation
+            existing_session = _claude_sessions.get(conv_id)
+
+            if existing_session:
+                # RESUME: send user message + vector context for relevant knowledge
+                vector_ctx = ""
+                try:
+                    vector_ctx = memory_ref._vector_search(capsule, user_text)
+                except Exception as e:
+                    logger.debug(f"[web] Resume vector search failed: {e}")
+                if vector_ctx:
+                    prompt = user_text + file_context + "\n\n" + vector_ctx
+                else:
+                    prompt = user_text + file_context
+                engine_cfg.resume_session_id = existing_session
+                logger.info(f"[web] Resuming session {existing_session[:12]}… for conv_id={conv_id} (vector: {'yes' if vector_ctx else 'no'})")
+            else:
+                # NEW SESSION: build full context
+                from neura.core.context import ContextBuilder
+                parts = await memory_ref.build_context_parts(capsule, user_text)
+
+                # Load conversation history (THIS chat only, last 20 messages)
+                if db_pool_ref and conv_id:
+                    try:
+                        history_rows = await db_pool_ref.fetch(
+                            """SELECT role, content FROM messages
+                               WHERE conversation_id = $1
+                               ORDER BY created_at ASC
+                               LIMIT 20""",
+                            conv_id,
+                        )
+                        if history_rows:
+                            history_lines = []
+                            for row in history_rows:
+                                prefix = "Пользователь" if row["role"] == "user" else "Агент"
+                                content = (row["content"] or "")[:500]
+                                history_lines.append(f"{prefix}: {content}")
+                            parts.conversation_history = "\n".join(history_lines)
+                    except Exception as e:
+                        logger.warning("Failed to load conversation history: %s", e)
+
+                # Cross-project context: recent messages from OTHER conversations
+                if db_pool_ref and conv_id:
+                    try:
+                        cross_rows = await db_pool_ref.fetch(
+                            """SELECT p.name AS project_name, c.title AS chat_title,
+                                      m.role, m.content, m.created_at
+                               FROM messages m
+                               JOIN conversations c ON c.id = m.conversation_id
+                               LEFT JOIN projects p ON p.id = c.project_id
+                               WHERE c.user_id = $1
+                                 AND c.id != $2
+                                 AND m.created_at > NOW() - INTERVAL '24 hours'
+                               ORDER BY m.created_at DESC
+                               LIMIT 10""",
+                            session.user_id, conv_id,
+                        )
+                        if cross_rows:
+                            by_project: dict[str, list[str]] = {}
+                            for row in reversed(cross_rows):  # chronological
+                                proj = row["project_name"] or "Без проекта"
+                                chat = row["chat_title"] or "Чат"
+                                key = f"{proj} / {chat}"
+                                if key not in by_project:
+                                    by_project[key] = []
+                                prefix = "Пользователь" if row["role"] == "user" else "Агент"
+                                by_project[key].append(f"{prefix}: {(row['content'] or '')[:200]}")
+                            lines: list[str] = []
+                            for key, msgs in by_project.items():
+                                lines.append(f"[{key}]")
+                                lines.extend(msgs[-4:])  # last 4 per chat
+                            parts.cross_project_context = "\n".join(lines)
+                    except Exception as e:
+                        logger.warning("Failed to load cross-project context: %s", e)
+
+                builder = ContextBuilder(capsule)
+                prompt = builder.build(user_text + file_context, parts, is_first_message=True)
+
+            # Link understanding: enrich prompt with URL metadata
+            from neura.core.link_understanding import enrich_with_links, extract_urls
+            if extract_urls(user_text):
+                try:
+                    import redis.asyncio as _redis_mod
+                    _redis_tmp = _redis_mod.from_url("redis://localhost:6379")
+                    link_ctx = await enrich_with_links(user_text, _redis_tmp)
+                    await _redis_tmp.aclose()
+                    if link_ctx:
+                        prompt += link_ctx
+                        logger.info(f"[web] Link context added: {len(link_ctx)} chars")
+                except Exception as e:
+                    logger.warning(f"[web] Link understanding failed: {e}")
+
+            # Retry loop with exponential backoff (max 3 attempts)
+            import random
+            max_retries = 3
+            for attempt in range(max_retries):
+                had_error = False
+                accumulated = ""
+
+                async for chunk in engine_obj.stream(prompt, engine_cfg):
+                    if chunk.session_id and not result_session_id:
+                        result_session_id = chunk.session_id
+                    if chunk.type == "text":
+                        accumulated += chunk.text
+                        await session.broadcast({"type": "text", "content": accumulated})
+                    elif chunk.type == "tool_start":
+                        tools_used.append(chunk.tool)
+                        await session.broadcast({"type": "tool", "content": chunk.text})
+                    elif chunk.type == "result":
+                        accumulated = chunk.text or accumulated
+                        if chunk.session_id:
+                            result_session_id = chunk.session_id
+                    elif chunk.type == "error":
+                        had_error = True
+                        error_text = chunk.text or ""
+                        # Don't broadcast retryable errors to user yet
+                        if attempt < max_retries - 1 and _is_retryable_error(error_text):
+                            break
+                        await session.broadcast({"type": "error", "content": chunk.text})
+
+                # If success or non-retryable error — stop
+                if not had_error or accumulated:
+                    break
+                if attempt < max_retries - 1 and had_error:
+                    delay = (2 ** attempt) + random.uniform(0, 1)  # 1-2s, 2-3s, 4-5s
+                    logger.warning(f"[web] Retry {attempt+1}/{max_retries} for conv_id={conv_id}, waiting {delay:.1f}s")
+                    await session.broadcast({"type": "status", "content": f"Повторная попытка ({attempt+2}/{max_retries})..."})
+                    await asyncio.sleep(delay)
+
+            # Save or invalidate Claude CLI session
+            if had_error and existing_session:
+                _claude_sessions.pop(conv_id, None)
+                logger.info(f"[web] Session invalidated for conv_id={conv_id}")
+            elif result_session_id:
+                _claude_sessions[conv_id] = result_session_id
+                logger.info(f"[web] Session saved: {result_session_id[:12]}… for conv_id={conv_id}")
+                # Evict oldest if too many
+                if len(_claude_sessions) > _CLAUDE_SESSIONS_MAX:
+                    oldest_key = next(iter(_claude_sessions))
+                    _claude_sessions.pop(oldest_key, None)
+
+        except asyncio.CancelledError:
+            logger.info("Stream cancelled by user for conv_id=%d", conv_id)
+        except Exception as exc:
+            logger.error("Stream error conv_id=%d: %s", conv_id, exc, exc_info=True)
+            await session.broadcast({"type": "error", "content": str(exc)})
+
+        duration = time.monotonic() - start_time
+
+        # Process [FILE:] markers — replace with web-accessible URLs
+        if accumulated and _FILE_MARKER_RE.search(accumulated):
+            accumulated = _process_file_markers(accumulated)
+            # Send final version with resolved file URLs
+            await session.broadcast({"type": "text", "content": accumulated})
+
+        # Save results to DB (regardless of WS connection)
+        try:
+            if db_pool_ref and user_text:
+                msg_count = await db_pool_ref.fetchval(
+                    "SELECT COUNT(*) FROM messages WHERE conversation_id = $1", conv_id,
+                )
+                if msg_count <= 2:
+                    auto_title = user_text[:60].strip()
+                    if auto_title:
+                        await db_pool_ref.execute(
+                            "UPDATE conversations SET title = $1 WHERE id = $2",
+                            auto_title, conv_id,
+                        )
+
+            if db_pool_ref and requested_model:
+                await db_pool_ref.execute(
+                    "UPDATE conversations SET model = $1 WHERE id = $2",
+                    requested_model, conv_id,
+                )
+
+            if db_pool_ref and accumulated:
+                await db_pool_ref.execute(
+                    """INSERT INTO messages (conversation_id, role, content, model, duration_sec)
+                       VALUES ($1, 'assistant', $2, $3, $4)""",
+                    conv_id, accumulated, model_name, duration,
+                )
+
+            if memory_ref and capsule and accumulated:
+                from neura.core.memory import DiaryEntry
+                now = datetime.now(timezone.utc)
+                entry = DiaryEntry(
+                    capsule_id=capsule_id or "",
+                    date=now.strftime("%Y-%m-%d"),
+                    time=now.strftime("%H:%M:%S"),
+                    user_message=user_text[:2000],
+                    bot_response=accumulated[:2000],
+                    model=model_name,
+                    tools_used=tools_used,
+                    source="web",
+                )
+                await memory_ref.add_diary(entry)
+        except Exception as e:
+            logger.error(f"Stream post-save error: {e}")
+
+        final = {
+            "type": "done",
+            "content": accumulated,
+            "model": model_name,
+            "duration": round(duration, 2),
+        }
+        session.final_chunk = final
+        session.done = True
+        session.done_at = time.monotonic()
+        await session.broadcast(final)
+
+    WS_PING_INTERVAL = 30  # seconds between pings
+    WS_PING_TIMEOUT = 10   # seconds to wait for pong
 
     @app.websocket("/ws/chat/{conv_id}")
     async def ws_chat(websocket: WebSocket, conv_id: int):
@@ -550,13 +1293,16 @@ def create_web_app(
         Auth: token in query param ?token=<JWT>
         Protocol:
           Client → {"text": "...", "files": [...]}
+          Client → {"type": "cancel"}
+          Client → {"type": "pong"}
           Server ← {"type": "status", "content": "..."}
           Server ← {"type": "text", "content": "partial text"}
           Server ← {"type": "tool", "content": "🔧 Reading..."}
           Server ← {"type": "done", "content": "...", "model": "sonnet", "duration": 3.2}
           Server ← {"type": "error", "content": "..."}
+          Server ← {"type": "busy", "content": "...", "active_chats": [...]}
+          Server ← {"type": "ping"}
         """
-        # Extract token from query
         token = websocket.query_params.get("token", "")
         try:
             from neura.transport.auth import decode_token
@@ -569,9 +1315,39 @@ def create_web_app(
 
         await websocket.accept()
 
+        # Heartbeat: track last pong time for this connection
+        last_pong = time.monotonic()
+        ping_task: asyncio.Task | None = None
+
+        async def _ping_loop():
+            """Send periodic pings, close if no pong received."""
+            nonlocal last_pong
+            missed = 0
+            while True:
+                await asyncio.sleep(WS_PING_INTERVAL)
+                try:
+                    await websocket.send_json({"type": "ping"})
+                    # Check if last pong was recent enough
+                    if time.monotonic() - last_pong > WS_PING_INTERVAL * 3:
+                        missed += 1
+                        logger.warning(
+                            "WS heartbeat: %d missed pongs (conv=%d, user=%d)",
+                            missed, conv_id, user_id,
+                        )
+                        if missed >= 3:
+                            logger.info("WS heartbeat: closing stale connection (conv=%d)", conv_id)
+                            await websocket.close(code=4002, reason="Heartbeat timeout")
+                            return
+                    else:
+                        missed = 0
+                except Exception:
+                    return  # WebSocket already closed
+
+        ping_task = asyncio.create_task(_ping_loop())
+
         db_pool = websocket.app.state.db_pool
-        engine = websocket.app.state.engine
-        capsules = websocket.app.state.capsules
+        engine_obj = websocket.app.state.engine
+        capsules_map = websocket.app.state.capsules
 
         # Verify conversation ownership
         if db_pool:
@@ -584,19 +1360,89 @@ def create_web_app(
                 await websocket.close()
                 return
 
+        # Subscribe to existing session (reconnect scenario)
+        existing = stream_mgr.get_session(user_id, conv_id)
+        if existing and not existing.done:
+            existing.subscribers.add(websocket)
+            # Replay accumulated chunks
+            for chunk in existing.chunks:
+                try:
+                    await websocket.send_json(chunk)
+                except Exception:
+                    break
+
         try:
             while True:
                 raw = await websocket.receive_json()
+
+                # Handle pong (heartbeat response)
+                if raw.get("type") == "pong":
+                    last_pong = time.monotonic()
+                    continue
+
+                # Handle cancel
+                if raw.get("type") == "cancel":
+                    session = stream_mgr.get_session(user_id, conv_id)
+                    if session and not session.done:
+                        session.cancel()
+                    continue
+
                 user_text = raw.get("text", "").strip()
                 files = raw.get("files", [])
+                requested_model = raw.get("model", None)
 
                 if not user_text and not files:
                     continue
 
+                # Rate limit check (per-capsule, per-minute)
+                rl_key = capsule_id or f"user:{user_id}"
+                allowed, wait_sec = _rate_limiter.check(rl_key)
+                if not allowed:
+                    await websocket.send_json({
+                        "type": "error",
+                        "content": f"Слишком много запросов. Подождите {wait_sec:.0f} сек."
+                    })
+                    continue
+
+                # Check concurrent stream limit
+                active = stream_mgr.active_count(user_id)
+                # Don't count this conv if it already has a done/no session
+                current_session = stream_mgr.get_session(user_id, conv_id)
+                if current_session and not current_session.done:
+                    active -= 1  # this conv already counted
+
+                if active >= MAX_CONCURRENT_STREAMS:
+                    active_chats = [
+                        s.conv_id for s in stream_mgr.active_sessions(user_id)
+                        if s.conv_id != conv_id
+                    ]
+                    await websocket.send_json({
+                        "type": "busy",
+                        "content": f"Уже работают {active} агента в других чатах. Дождитесь завершения или остановите их.",
+                        "active_chats": active_chats,
+                    })
+                    continue
+
+                # Voice transcription
+                VOICE_EXTS = {".webm", ".ogg", ".wav", ".mp3", ".m4a", ".oga"}
+                voice_files = [f for f in files if any(f.lower().endswith(ext) for ext in VOICE_EXTS)]
+                if voice_files and not user_text:
+                    await websocket.send_json({"type": "status", "content": "Транскрибирую голос..."})
+                    try:
+                        from neura.transport.protocol import transcribe_voice
+                        transcript = await transcribe_voice(voice_files[0])
+                        if transcript:
+                            user_text = transcript
+                            files = [f for f in files if f not in voice_files]
+                    except Exception as e:
+                        logger.error(f"Voice transcription error: {e}")
+                        await websocket.send_json({"type": "error", "content": "Не удалось распознать голос"})
+                        continue
+
                 # Resolve capsule
                 capsule = None
-                if capsule_id and capsules:
-                    capsule = capsules.get(capsule_id)
+                if capsule_id and capsules_map:
+                    capsule = capsules_map.get(capsule_id)
 
                 # Save user message
                 if db_pool:
@@ -606,91 +1452,65 @@ def create_web_app(
                         conv_id, user_text, __import__("json").dumps(files),
                     )
 
-                # Status ping
-                await websocket.send_json({"type": "status", "content": "⏳ Думаю..."})
-
-                start_time = time.monotonic()
-                accumulated = ""
-                tools_used: list[str] = []
-
-                if engine is None or capsule is None:
-                    # No capsule/engine — send error, don't fake responses
+                if engine_obj is None or capsule is None:
                     await websocket.send_json({
                         "type": "error",
                         "content": "Агент не настроен. Обратитесь к администратору.",
                     })
                     continue
-                else:
-                    # Build context and stream
-                    from neura.core.context import ContextBuilder
-                    from neura.core.memory import MemoryStore
-                    memory: MemoryStore = websocket.app.state.memory
-                    from neura.transport.protocol import IncomingMessage, MessageType
-                    incoming = IncomingMessage(
-                        capsule_id=capsule_id or "",
-                        user_id=user_id,
-                        user_name="",
-                        text=user_text,
-                        message_type=MessageType.TEXT,
-                    )
-                    parts = await memory.build_context_parts(capsule, user_text)
-                    builder = ContextBuilder(capsule)
-                    prompt = builder.build(user_text, parts, is_first_message=True)
 
-                    engine_cfg = capsule.get_engine_config()
-
-                    async for chunk in engine.stream(prompt, engine_cfg):
-                        if chunk.type == "text":
-                            accumulated += chunk.text
-                            await websocket.send_json({"type": "text", "content": accumulated})
-                        elif chunk.type == "tool_start":
-                            tools_used.append(chunk.tool)
-                            await websocket.send_json({"type": "tool", "content": chunk.text})
-                        elif chunk.type == "result":
-                            accumulated = chunk.text or accumulated
-                        elif chunk.type == "error":
-                            await websocket.send_json({"type": "error", "content": chunk.text})
-
-                duration = time.monotonic() - start_time
-
-                # Auto-title: set first-message title
-                if db_pool and user_text:
-                    msg_count = await db_pool.fetchval(
-                        "SELECT COUNT(*) FROM messages WHERE conversation_id = $1",
-                        conv_id,
-                    )
-                    if msg_count <= 2:  # user + (about to add) assistant
-                        auto_title = user_text[:60].strip()
-                        if auto_title:
-                            await db_pool.execute(
-                                "UPDATE conversations SET title = $1 WHERE id = $2",
-                                auto_title, conv_id,
-                            )
-
-                # Save assistant message
-                if db_pool and accumulated:
-                    model_name = getattr(capsule.config if capsule else None, "model", "sonnet") or "sonnet"
-                    await db_pool.execute(
-                        """INSERT INTO messages (conversation_id, role, content, model, duration_sec)
-                           VALUES ($1, 'assistant', $2, $3, $4)""",
-                        conv_id, accumulated, model_name, duration,
+                # Build engine config
+                engine_cfg = capsule.get_engine_config()
+                if requested_model:
+                    MODEL_MAP = {
+                        "sonnet-4-6": "sonnet",
+                        "opus-4-6": "opus",
+                        "haiku-4-5": "haiku",
+                    }
+                    mapped = MODEL_MAP.get(requested_model, requested_model)
+                    engine_cfg = EngineConfig(
+                        model=mapped,
+                        effort=engine_cfg.effort,
+                        allowed_tools=engine_cfg.allowed_tools,
+                        home_dir=engine_cfg.home_dir,
+                        append_system_prompt=engine_cfg.append_system_prompt,
                     )
 
-                await websocket.send_json({
-                    "type": "done",
-                    "content": accumulated,
-                    "model": "sonnet",
-                    "duration": round(duration, 2),
-                })
+                # Create background stream session
+                session = stream_mgr.create_session(user_id, conv_id)
+                session.subscribers.add(websocket)
+
+                await session.broadcast({"type": "status", "content": "Думаю..."})
+
+                session.task = asyncio.create_task(
+                    _run_stream(
+                        session, engine_obj, capsule, capsule_id,
+                        user_text, engine_cfg, requested_model,
+                        db_pool, websocket.app.state.memory, conv_id,
+                        files,
+                    )
+                )
 
         except WebSocketDisconnect:
-            logger.info("WebSocket disconnected: conv_id=%d user_id=%d", conv_id, user_id)
+            logger.info("WebSocket disconnected: conv_id=%d user_id=%d (stream continues in background)", conv_id, user_id)
+            # Remove from subscribers but DON'T cancel the stream
+            session = stream_mgr.get_session(user_id, conv_id)
+            if session:
+                session.subscribers.discard(websocket)
         except Exception as exc:
             logger.error("WebSocket error: %s", exc, exc_info=True)
             try:
                 await websocket.send_json({"type": "error", "content": str(exc)})
             except Exception:
                 pass
+        finally:
+            # Stop heartbeat ping task
+            if ping_task and not ping_task.done():
+                ping_task.cancel()
+                try:
+                    await ping_task
+                except asyncio.CancelledError:
+                    pass
 
     # ── Helpers ──────────────────────────────────────────────────
 
@@ -704,9 +1524,19 @@ def create_web_app(
         }
 
     def _project_to_dict(row) -> dict:
+        import json as _json
+        links_raw = row.get("links", "[]")
+        if isinstance(links_raw, str):
+            try:
+                links_raw = _json.loads(links_raw)
+            except Exception:
+                links_raw = []
         return {
             "id": row["id"],
             "name": row["name"],
+            "description": row.get("description", ""),
+            "instructions": row.get("instructions", ""),
+            "links": links_raw or [],
             "pinned": row["pinned"],
             "icon": row["icon"],
             "sort_order": row["sort_order"],
@@ -721,6 +1551,7 @@ def create_web_app(
             "title": row["title"],
             "project_id": row["project_id"],
             "pinned": row["pinned"],
+            "model": row.get("model"),
             "last_message": lm[:100] if lm else None,
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,

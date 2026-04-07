@@ -1,0 +1,280 @@
+{
+  "version": "1.0",
+  "integrations": {
+    "web_search": {
+      "name": "Поиск в интернете",
+      "description": "Поиск актуальной информации в реальном времени",
+      "icon": "🔍",
+      "difficulty": "easy",
+      "estimated_minutes": 1,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Работает автоматически. Просто попросите агента что-нибудь найти.", "type": "info"}
+      ],
+      "verification": {"type": "prompt_test", "prompt": "Найди последние новости про AI"}
+    },
+    "image_gen": {
+      "name": "Генерация изображений",
+      "description": "Создание картинок, обложек, постов по описанию",
+      "icon": "🎨",
+      "difficulty": "easy",
+      "estimated_minutes": 1,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Доступно сразу. Попросите: «Создай изображение...»", "type": "info"}
+      ],
+      "verification": {"type": "prompt_test", "prompt": "Создай простое изображение заката"}
+    },
+    "pdf_word_excel": {
+      "name": "PDF / Word / Excel",
+      "description": "Создание документов, отчётов, таблиц, презентаций",
+      "icon": "📄",
+      "difficulty": "easy",
+      "estimated_minutes": 2,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Скиллы документов установлены. Попросите создать документ.", "type": "info"}
+      ],
+      "verification": null
+    },
+    "voice_transcription": {
+      "name": "Транскрибация голосовых",
+      "description": "Расшифровка аудиосообщений и голосовых в текст",
+      "icon": "🎙",
+      "difficulty": "easy",
+      "estimated_minutes": 1,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Отправьте голосовое сообщение — агент автоматически расшифрует.", "type": "info"}
+      ],
+      "verification": null
+    },
+    "telegraph": {
+      "name": "Telegraph (длинные ответы)",
+      "description": "Автоматическое создание страниц для длинных ответов",
+      "icon": "📰",
+      "difficulty": "easy",
+      "estimated_minutes": 1,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Работает автоматически при длинных ответах (>4000 символов).", "type": "info"}
+      ],
+      "verification": null
+    },
+    "google_calendar": {
+      "name": "Google Календарь",
+      "description": "Управление расписанием, записи клиентов, напоминания",
+      "icon": "📅",
+      "difficulty": "medium",
+      "estimated_minutes": 10,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Отправьте команду /connect_google в чат", "type": "action"},
+        {"text": "Перейдите по ссылке от бота и войдите в Google-аккаунт", "type": "action"},
+        {"text": "Нажмите «Разрешить» на всех запрошенных доступах", "type": "action"},
+        {"text": "Скопируйте код авторизации и отправьте его боту", "type": "action"}
+      ],
+      "verification": {"type": "command", "command": "/check_google"}
+    },
+    "google_sheets": {
+      "name": "Google Таблицы",
+      "description": "Чтение и редактирование таблиц, аналитика",
+      "icon": "📊",
+      "difficulty": "medium",
+      "estimated_minutes": 10,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["business", "analytics"],
+      "setup_steps": [
+        {"text": "Подключается вместе с Google Календарём через OAuth", "type": "info"},
+        {"text": "Если Google уже подключён — таблицы доступны автоматически", "type": "info"},
+        {"text": "Если нет — отправьте /connect_google и пройдите авторизацию", "type": "action"}
+      ],
+      "verification": {"type": "command", "command": "/check_google"}
+    },
+    "google_drive": {
+      "name": "Google Диск",
+      "description": "Работа с файлами, документами, совместный доступ",
+      "icon": "💾",
+      "difficulty": "medium",
+      "estimated_minutes": 10,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Подключается вместе с Google Календарём через OAuth", "type": "info"},
+        {"text": "Если Google уже подключён — Диск доступен автоматически", "type": "info"},
+        {"text": "Если нет — отправьте /connect_google и пройдите авторизацию", "type": "action"}
+      ],
+      "verification": {"type": "command", "command": "/check_google"}
+    },
+    "telegram_userbot": {
+      "name": "Telegram Userbot",
+      "description": "Чтение каналов, пересылка сообщений, отправка от имени",
+      "icon": "✉️",
+      "difficulty": "medium",
+      "estimated_minutes": 15,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["marketing", "sales"],
+      "setup_steps": [
+        {"text": "Подготовьте номер телефона, привязанный к Telegram", "type": "info"},
+        {"text": "Агент запросит код из SMS или из приложения Telegram", "type": "info"},
+        {"text": "Если включена двухфакторная авторизация — подготовьте пароль", "type": "info"},
+        {"text": "Отправьте команду /connect_telegram для начала подключения", "type": "action"}
+      ],
+      "verification": null
+    },
+    "notebooklm": {
+      "name": "NotebookLM (анализ документов)",
+      "description": "Глубокий анализ документов, создание подкастов, исследования",
+      "icon": "📓",
+      "difficulty": "medium",
+      "estimated_minutes": 5,
+      "auto_setup": true,
+      "requires_credentials": false,
+      "relevant_for": ["research", "education"],
+      "setup_steps": [
+        {"text": "Доступен через скилл notebooklm. Попросите: «Проанализируй документ»", "type": "info"}
+      ],
+      "verification": null
+    },
+    "instagram_parser": {
+      "name": "Instagram парсер",
+      "description": "Анализ контента конкурентов, парсинг профилей и постов",
+      "icon": "📷",
+      "difficulty": "hard",
+      "estimated_minutes": 20,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["marketing", "content"],
+      "setup_steps": [
+        {"text": "Для парсинга нужен Playwright и сессия Instagram", "type": "info"},
+        {"text": "Подготовьте логин и пароль Instagram-аккаунта (можно рабочий)", "type": "action"},
+        {"text": "Администратор настроит подключение (требуется помощь)", "type": "info"}
+      ],
+      "verification": null
+    },
+    "getcourse": {
+      "name": "GetCourse API",
+      "description": "Управление курсами, учениками, вебинарами",
+      "icon": "🎓",
+      "difficulty": "hard",
+      "estimated_minutes": 25,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["education", "coaching"],
+      "setup_steps": [
+        {"text": "Войдите в GetCourse → Настройки → API", "type": "action"},
+        {"text": "Скопируйте API-ключ (секретный ключ)", "type": "action"},
+        {"text": "Скопируйте URL вашего аккаунта (например: myschool.getcourse.ru)", "type": "action"},
+        {"text": "Отправьте боту: API-ключ и URL через пробел", "type": "action"}
+      ],
+      "verification": {"type": "api_check", "endpoint": "/account"}
+    },
+    "bitrix24": {
+      "name": "Битрикс24 CRM",
+      "description": "CRM, задачи, чаты, управление сделками",
+      "icon": "🏢",
+      "difficulty": "hard",
+      "estimated_minutes": 20,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["business", "sales", "manufacturing"],
+      "setup_steps": [
+        {"text": "Войдите в Битрикс24 → Приложения → Вебхуки", "type": "action"},
+        {"text": "Создайте входящий вебхук с правами: crm, task, im, user", "type": "action"},
+        {"text": "Скопируйте URL вебхука (выглядит как https://your.bitrix24.ru/rest/1/xxxxx/)", "type": "action"},
+        {"text": "Отправьте боту URL вебхука", "type": "action"}
+      ],
+      "verification": {"type": "api_check", "endpoint": "/profile"}
+    },
+    "vk_community": {
+      "name": "ВКонтакте сообщество",
+      "description": "Управление группой, посты, сообщения",
+      "icon": "📱",
+      "difficulty": "hard",
+      "estimated_minutes": 15,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["marketing", "sales"],
+      "setup_steps": [
+        {"text": "Откройте настройки сообщества → Работа с API", "type": "action"},
+        {"text": "Создайте ключ доступа с нужными правами", "type": "action"},
+        {"text": "Скопируйте токен сообщества", "type": "action"},
+        {"text": "Отправьте боту токен и ID сообщества", "type": "action"}
+      ],
+      "verification": {"type": "api_check", "endpoint": "groups.getById"}
+    },
+    "icloud_calendar": {
+      "name": "iCloud Календарь",
+      "description": "Расписание Apple Calendar, синхронизация событий",
+      "icon": "🍎",
+      "difficulty": "medium",
+      "estimated_minutes": 10,
+      "auto_setup": false,
+      "requires_credentials": true,
+      "relevant_for": ["all"],
+      "setup_steps": [
+        {"text": "Перейдите на appleid.apple.com → Безопасность → Пароли приложений", "type": "action"},
+        {"text": "Создайте пароль приложения для «AI-агент»", "type": "action"},
+        {"text": "Отправьте боту: Apple ID и пароль приложения (НЕ основной пароль!)", "type": "action"}
+      ],
+      "verification": null
+    }
+  },
+  "profiles": {
+    "psychologist": {
+      "tags": ["coaching", "education", "психолог", "терапевт", "консультант", "коуч"],
+      "recommended": ["web_search", "voice_transcription", "google_calendar", "telegraph", "pdf_word_excel", "image_gen"],
+      "hidden": ["bitrix24", "vk_community"]
+    },
+    "manufacturer": {
+      "tags": ["business", "manufacturing", "производство", "фабрика", "завод", "оптовик"],
+      "recommended": ["web_search", "bitrix24", "google_sheets", "pdf_word_excel", "vk_community", "voice_transcription"],
+      "hidden": ["getcourse", "notebooklm", "instagram_parser"]
+    },
+    "coach": {
+      "tags": ["education", "coaching", "тренер", "курс", "обучение", "школа", "наставник"],
+      "recommended": ["web_search", "getcourse", "google_calendar", "telegraph", "voice_transcription", "pdf_word_excel"],
+      "hidden": ["bitrix24", "vk_community"]
+    },
+    "content_creator": {
+      "tags": ["marketing", "content", "блогер", "контент", "smm", "маркетолог", "реклама"],
+      "recommended": ["web_search", "image_gen", "instagram_parser", "telegram_userbot", "telegraph", "voice_transcription"],
+      "hidden": ["bitrix24", "getcourse"]
+    },
+    "beauty": {
+      "tags": ["beauty", "красота", "массаж", "косметолог", "стилист", "парикмахер", "маникюр"],
+      "recommended": ["web_search", "google_calendar", "instagram_parser", "image_gen", "telegraph", "voice_transcription"],
+      "hidden": ["bitrix24", "getcourse"]
+    },
+    "therapist": {
+      "tags": ["health", "врач", "медицина", "нутрициолог", "диетолог", "остеопат"],
+      "recommended": ["web_search", "google_calendar", "voice_transcription", "telegraph", "pdf_word_excel"],
+      "hidden": ["bitrix24", "vk_community", "instagram_parser"]
+    },
+    "designer": {
+      "tags": ["design", "дизайн", "интерьер", "архитектор", "графический", "UI", "UX"],
+      "recommended": ["web_search", "image_gen", "google_drive", "instagram_parser", "pdf_word_excel", "telegraph"],
+      "hidden": ["bitrix24", "getcourse"]
+    },
+    "default": {
+      "tags": ["all"],
+      "recommended": ["web_search", "voice_transcription", "telegraph", "pdf_word_excel", "image_gen"],
+      "hidden": []
+    }
+  }
+}

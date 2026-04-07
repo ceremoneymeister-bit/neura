@@ -4,10 +4,11 @@ import { wsUrl } from '@/api/client'
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 export interface WsChunk {
-  type: 'status' | 'text' | 'tool' | 'done' | 'error'
+  type: 'status' | 'text' | 'tool' | 'done' | 'error' | 'busy' | 'ping'
   content: string
   model?: string
   duration?: number
+  active_chats?: number[]
 }
 
 interface UseWebSocketOptions {
@@ -53,6 +54,11 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     ws.onmessage = (evt: MessageEvent<string>) => {
       try {
         const chunk = JSON.parse(evt.data) as WsChunk
+        // Heartbeat: respond to server ping with pong
+        if (chunk.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong' }))
+          return
+        }
         if (chunk.type === 'done') {
           onDone?.(chunk)
         }
@@ -92,11 +98,17 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     return () => disconnect()
   }, [conversationId, connect, disconnect])
 
-  const send = useCallback((text: string, files: string[] = []) => {
+  const send = useCallback((text: string, files: string[] = [], model?: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ text, files }))
+      wsRef.current.send(JSON.stringify({ text, files, ...(model && { model }) }))
     }
   }, [])
 
-  return { status, send, connect, disconnect }
+  const sendCancel = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'cancel' }))
+    }
+  }, [])
+
+  return { status, send, sendCancel, connect, disconnect }
 }

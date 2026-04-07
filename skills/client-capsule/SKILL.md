@@ -3,6 +3,17 @@ name: client-capsule
 version: 1.0
 description: Развёртывание изолированной клиентской капсулы (Docker + Telegram + admin-agent)
 triggers: ["капсула", "изоляция клиента", "Docker клиент", "отдельный сервер для клиента", "userbot клиента"]
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый клиент"
+proactive_trigger_1_action: "предложить создание изолированной капсулы"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "обновление эталона neura-capsule/"
+proactive_trigger_2_action: "синхронизировать все капсулы"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Client Capsule — развёртывание изолированной клиентской среды
@@ -688,3 +699,9 @@ python3 scripts/capsule-dashboard.py --json  # JSON — для парсинга 
 В `config.json` → `"trial": {"enabled": true, "days": N}`. Логика в `bot/handlers/access.py` → `_check_trial()`.
 Состояние: `data/trial_state.json` (first_interaction timestamp).
 По умолчанию `enabled: false` — включать только для тестовых клиентов.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

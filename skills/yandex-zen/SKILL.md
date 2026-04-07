@@ -9,6 +9,14 @@ category: content
 tags: [yandex-zen, dzen, articles, content-strategy, monetization, seo, auto-publishing]
 risk: medium
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "вторник/пятница"
+proactive_trigger_1_action: "предложить статью для Дзена"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Яндекс Дзен — полный скилл для работы с платформой
@@ -191,3 +199,9 @@ source: internal
 База построена на анализе **1119 постов** канала «Градов про Дзен» (21K подп., 2023-2026). Игорь Градов — оператор сети 115+ каналов с оборотом 6.8 млн ₽/мес. 500+ учеников в школе Dzen Guru.
 
 Все reference-файлы содержат даты постов-источников для отслеживания актуальности.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

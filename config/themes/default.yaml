@@ -1,0 +1,33 @@
+id: default
+name: Neura
+logo_text: Neura
+logo_icon: null  # uses default SVG
+accent: "#7c3aed"
+accent_hover: "#6d28d9"
+accent_muted: "rgba(124, 58, 237, 0.15)"
+accent_light: "#a78bfa"
+accent_gradient: "linear-gradient(135deg, #7c3aed, #a78bfa)"
+accent_glow: "0 0 20px rgba(124, 58, 237, 0.3)"
+brand_clay: "#d87756"
+# dark overrides (applied when data-theme=dark)
+dark:
+  bg_primary: "#252523"
+  bg_sidebar: "#2f2f2d"
+  bg_card: "#1f1e1d"
+  bg_input: "#1f1e1d"
+  bg_hover: "#2c2c2a"
+  text_primary: "#faf9f5"
+  text_secondary: "#c1bfb5"
+  text_muted: "#9b9991"
+  border: "rgba(225, 224, 217, 0.08)"
+# light overrides
+light:
+  bg_primary: "#faf9f7"
+  bg_sidebar: "#f0efec"
+  bg_card: "#ffffff"
+  bg_input: "#ffffff"
+  bg_hover: "#eae9e5"
+  text_primary: "#1a1a18"
+  text_secondary: "#4a4a45"
+  text_muted: "#8a8a82"
+  border: "rgba(0, 0, 0, 0.08)"

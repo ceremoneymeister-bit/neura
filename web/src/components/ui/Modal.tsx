@@ -11,7 +11,6 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, className = '' }: ModalProps) {
-  // Close on Escape
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -31,25 +30,25 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
-          {/* Dialog */}
           <motion.div
-            className={`relative z-10 w-full max-w-md rounded-[8px] bg-[#141414] border border-[#262626] shadow-xl ${className}`}
+            className={`relative z-10 w-full max-w-md rounded-lg bg-[var(--bg-card)] border border-[var(--border)] shadow-xl ${className}`}
             initial={{ scale: 0.95, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
             {title && (
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#262626]">
-                <h2 className="text-sm font-semibold text-[#f5f5f5]">{title}</h2>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
                 <button
                   onClick={onClose}
-                  className="text-[#525252] hover:text-[#f5f5f5] transition-colors"
+                  aria-label="Закрыть"
+                  title="Закрыть"
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <X size={16} />
                 </button>

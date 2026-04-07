@@ -5,6 +5,7 @@ export interface Conversation {
   title: string
   project_id: number | null
   pinned: boolean
+  model: string | null
   last_message: string | null
   created_at: string | null
   updated_at: string | null

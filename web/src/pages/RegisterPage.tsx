@@ -32,15 +32,14 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-full bg-[#0a0a0a] px-4">
+    <div className="flex items-center justify-center min-h-full bg-[var(--bg-primary)] px-4">
       <div className="w-full max-w-sm animate-fade-in">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-[12px] bg-[#7c3aed] mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent)] mb-4">
             <span className="text-white text-xl font-bold">N</span>
           </div>
-          <h1 className="text-xl font-semibold text-[#f5f5f5]">Создать аккаунт</h1>
-          <p className="text-sm text-[#525252] mt-1">Neura AI Platform</p>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">Создать аккаунт</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Neura AI Platform</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -77,7 +76,7 @@ export function RegisterPage() {
           />
 
           {error && (
-            <p className="text-sm text-red-400 text-center bg-red-500/10 border border-red-500/20 rounded-[6px] px-3 py-2">
+            <p className="text-sm text-red-400 text-center bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">
               {error}
             </p>
           )}
@@ -87,9 +86,9 @@ export function RegisterPage() {
           </Button>
         </form>
 
-        <p className="text-center text-sm text-[#525252] mt-6">
+        <p className="text-center text-sm text-[var(--text-muted)] mt-6">
           Уже есть аккаунт?{' '}
-          <Link to="/login" className="text-[#7c3aed] hover:text-[#a78bfa] transition-colors">
+          <Link to="/login" className="text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors">
             Войти
           </Link>
         </p>

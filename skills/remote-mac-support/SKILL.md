@@ -13,6 +13,14 @@ usage_count: 1
 maturity: seed
 last_used: 2026-03-30
 created_from: Диагностика Mac Марины Павловой — remote session через Tailscale
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "проблема с Mac клиента"
+proactive_trigger_1_action: "удалённая диагностика через Tailscale"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # remote-mac-support
@@ -127,3 +135,9 @@ python3 scripts/tg-send.py <user> "[FILE:/tmp/mac-report.pdf]"
 - **SSH** — основной канал подключения
 - **tg-send.py** — отправка отчёта пользователю
 - **WeasyPrint** — генерация PDF-отчёта
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

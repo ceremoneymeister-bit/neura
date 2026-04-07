@@ -33,8 +33,9 @@ USAGE_LOG = DATA_DIR / "claude_usage.jsonl"
 CONFIG_FILE = DATA_DIR / "limits.json"
 REGISTRY_FILE = DATA_DIR / "cron-registry.json"
 ALERTS_FILE = DATA_DIR / "alerts_sent.json"
-REMINDERS_FILE = Path("/root/Antigravity/.secrets/reminders.json")
-TG_SEND = Path("/root/Antigravity/scripts/tg-send.py")
+_PROJECT = Path(os.environ.get("NEURA_BASE", str(Path(__file__).resolve().parent.parent.parent)))
+REMINDERS_FILE = _PROJECT / "data" / "reminders.json"
+TG_SEND = _PROJECT / "scripts" / "tg-send.py"
 
 # ── Default limits ──────────────────────────────────────────────
 

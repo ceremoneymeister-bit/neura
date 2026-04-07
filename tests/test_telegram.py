@@ -152,6 +152,7 @@ class TestHandleText:
         queue = AsyncMock()
         queue.check_rate_limit = AsyncMock(return_value=None)
         queue.is_processing = AsyncMock(return_value=True)
+        queue.get_processing_user = AsyncMock(return_value=111)  # same user
         queue.add_btw = AsyncMock(return_value=2)
         cap = _make_capsule()
         transport = TelegramTransport({"t": cap}, MagicMock(), MagicMock(), queue)

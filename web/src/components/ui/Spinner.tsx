@@ -9,7 +9,7 @@ const sizes: Record<Size, string> = {
 export function Spinner({ size = 'md', className = '' }: { size?: Size; className?: string }) {
   return (
     <span
-      className={`inline-block rounded-full border-[#7c3aed] border-t-transparent animate-spin ${sizes[size]} ${className}`}
+      className={`inline-block rounded-full border-[var(--accent)] border-t-transparent animate-spin ${sizes[size]} ${className}`}
       role="status"
       aria-label="Loading"
     />

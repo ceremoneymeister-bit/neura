@@ -8,6 +8,14 @@ updated: 2026-03-24
 category: testing
 tags: [testing, audit, bots, capsules, QA, functional-testing, integration-testing]
 risk: medium
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "после обновления бота/капсулы"
+proactive_trigger_1_action: "запустить 80+ тестов по 12 категориям"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Agent Test Suite — полное функциональное тестирование AI-агентов
@@ -478,3 +486,9 @@ L2 тесты только при провале L0/L1
 ```
 Конкретная капсула × конкретная категория → найти проблему → systematic-debugging
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

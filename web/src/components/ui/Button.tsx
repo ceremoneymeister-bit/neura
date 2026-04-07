@@ -13,12 +13,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer'
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer active:scale-[0.97]'
 
 const variants: Record<Variant, string> = {
-  primary:   'bg-[#7c3aed] text-white hover:bg-[#6d28d9] active:bg-[#5b21b6]',
-  secondary: 'bg-[#1e1e1e] text-[#f5f5f5] border border-[#262626] hover:bg-[#2a2a2a] active:bg-[#333]',
-  ghost:     'text-[#a3a3a3] hover:bg-[#1a1a1a] hover:text-[#f5f5f5] active:bg-[#262626]',
+  primary:   'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] active:bg-[#5b21b6]',
+  secondary: 'bg-[var(--bg-input)] text-[var(--text-primary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] active:bg-[var(--bg-card)]',
+  ghost:     'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] active:bg-[var(--border)]',
   danger:    'bg-red-600/15 text-red-400 border border-red-600/30 hover:bg-red-600/25 active:bg-red-600/35',
 }
 

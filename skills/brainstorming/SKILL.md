@@ -1,6 +1,14 @@
 ---
 name: brainstorming
 description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый проект/продукт"
+proactive_trigger_1_action: "запустить мозговой штурм"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Brainstorming Ideas Into Designs
@@ -104,3 +112,14 @@ digraph brainstorming {
 - **Explore alternatives** - Always propose 2-3 approaches before settling
 - **Incremental validation** - Present design, get approval before moving on
 - **Be flexible** - Go back and clarify when something doesn't make sense
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+- 2026-04-06: 6 использований, success rate 100.0%, avg latency 23.2s
+- 2026-04-06: 5 использований, success rate 100.0%, avg latency 22.0s

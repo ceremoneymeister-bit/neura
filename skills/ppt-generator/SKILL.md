@@ -1,6 +1,14 @@
 ---
 name: ppt-generator
 description: "Use when creating PowerPoint presentations (.pptx) — презентации, слайды, 'создай презентацию', 'сделай PPT', 'PowerPoint', питч-дек, отчёт в слайдах"
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужна презентация"
+proactive_trigger_1_action: "сгенерировать PPT"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # PPT Generator — создание презентаций
@@ -235,3 +243,14 @@ python3 scripts/ppt-create.py --title "Neura — AI-агенты" \
 ## Google Slides
 Для онлайн-презентаций: загрузить .pptx на Google Drive → откроется в Slides.
 Или использовать Google Slides API напрямую (отдельный MCP-сервер, не подключён пока).
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+- 2026-04-07: 6 использований, success rate 100.0%, avg latency 25.4s
+- 2026-04-07: 5 использований, success rate 100.0%, avg latency 23.9s

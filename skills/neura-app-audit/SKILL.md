@@ -7,6 +7,17 @@ tags: [neura-app, audit, branding, deploy, checklist]
 usage_count: 0
 maturity: seed
 last_used: null
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "перед деплоем Neura App"
+proactive_trigger_1_action: "запустить полный аудит branding"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "еженедельно понедельник"
+proactive_trigger_2_action: "проверить neura-ui.css и branding.js"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Neura App Audit — Branding Pre-Deploy Checklist
@@ -111,3 +122,9 @@ done
 ### CSS через JS
 - `injectGlobalStyles()` pattern: проверка по ID стиль-элемента
 - `body.neura-login-page` для login-specific
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

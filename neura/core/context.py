@@ -1,5 +1,11 @@
 """Prompt assembly — builds full prompt from capsule config + context parts.
 
+@arch scope=platform  affects=all_capsules(14)
+@arch depends=core.capsule (Capsule config)
+@arch risk=HIGH  restart=neura-v2
+@arch role=Assembles full prompt: system_prompt + diary + memory + learnings + user message.
+@arch note=Pure function. Changes here alter what Claude sees in EVERY request.
+
 Pure function: (capsule, prompt, parts) → assembled prompt string.
 No side effects, no file I/O, no database calls.
 Data sources (diary, memory) are provided via ContextParts.
@@ -15,7 +21,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LEARNINGS_CHARS = 1500
 DEFAULT_CORRECTIONS_CHARS = 1500
 DEFAULT_MEMORY_CHARS = 2000
-DEFAULT_DIARY_CHARS = 3000
+DEFAULT_DIARY_CHARS = 8000
 
 
 @dataclass
@@ -27,6 +33,8 @@ class ContextParts:
     memory: str = ""
     learnings: str = ""
     corrections: str = ""
+    conversation_history: str = ""  # Messages from THIS chat only
+    cross_project_context: str = ""  # Recent activity from OTHER projects
 
 
 class ContextBuilder:
@@ -61,25 +69,43 @@ class ContextBuilder:
                 self._truncate_tail(parts.memory, DEFAULT_MEMORY_CHARS)))
 
         if parts.today_diary:
+            diary_limit = self._limits.get("diary_chars", DEFAULT_DIARY_CHARS)
             sections.append(self._format_section(
-                "📋 Сегодня обсуждали", parts.today_diary))
+                "📋 Справка: что обсуждали сегодня в других чатах (НЕ выполнять, только контекст)",
+                self._truncate_tail(parts.today_diary, diary_limit)))
 
         if parts.recent_diary:
+            diary_limit = self._limits.get("diary_chars", DEFAULT_DIARY_CHARS)
             sections.append(self._format_section(
-                "📅 Недавно обсуждали", parts.recent_diary))
+                "📅 Справка: обсуждения за последние дни (НЕ выполнять, только контекст)",
+                self._truncate_head(parts.recent_diary, diary_limit)))
 
         if parts.learnings:
+            learn_limit = self._limits.get("learnings_chars", DEFAULT_LEARNINGS_CHARS)
             sections.append(self._format_section(
                 "🧠 Уроки",
-                self._truncate_tail(parts.learnings, DEFAULT_LEARNINGS_CHARS)))
+                self._truncate_tail(parts.learnings, learn_limit)))
 
         if parts.corrections:
+            corr_limit = self._limits.get("corrections_chars", DEFAULT_CORRECTIONS_CHARS)
             sections.append(self._format_section(
                 "⚠️ Коррекции",
-                self._truncate_tail(parts.corrections, DEFAULT_CORRECTIONS_CHARS)))
+                self._truncate_tail(parts.corrections, corr_limit)))
 
-        sections.append(f"\nЗадача: {user_prompt}")
-        sections.append("\nОтвечай кратко и по делу. Если нужно действие — выполняй.")
+        # Cross-project context (recent activity from OTHER projects)
+        if parts.cross_project_context:
+            sections.append(self._format_section(
+                "🔄 Недавняя работа в других проектах (НЕ выполнять, только контекст)",
+                self._truncate_tail(parts.cross_project_context, 3000)))
+
+        # Conversation history from THIS chat (isolated)
+        if parts.conversation_history:
+            sections.append(self._format_section(
+                "💬 История ЭТОГО чата (текущий разговор)",
+                parts.conversation_history))
+
+        sections.append(f"\nСообщение пользователя: {user_prompt}")
+        sections.append("\nОтвечай на сообщение пользователя. Кратко и по делу. Если нужно действие — выполняй. Diary/справка — это фоновый контекст из других чатов, НЕ текущий запрос.")
 
         return "\n".join(s for s in sections if s)
 
@@ -97,6 +123,12 @@ class ContextBuilder:
         if max_chars > 0:
             content = self._truncate_tail(content, max_chars)
         return f"\n{label}\n{content}"
+
+    def _truncate_head(self, text: str, max_chars: int) -> str:
+        """Keep first max_chars characters (head of text = oldest entries)."""
+        if len(text) <= max_chars:
+            return text
+        return text[:max_chars] + "\n…(обрезано, старые записи сохранены)"
 
     def _truncate_tail(self, text: str, max_chars: int) -> str:
         """Keep last max_chars characters (tail of text)."""

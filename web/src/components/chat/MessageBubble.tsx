@@ -6,6 +6,8 @@ import type { Components } from 'react-markdown'
 import type { Message } from '@/api/conversations'
 import { CodeBlock } from './CodeBlock'
 import { NeuraIcon } from '@/components/ui/NeuraIcon'
+import { fileIcon } from '@/utils/time'
+import { copyToClipboard } from '@/utils/clipboard'
 
 interface MessageBubbleProps {
   message: Message
@@ -27,7 +29,7 @@ const markdownComponents: Components = {
       return <CodeBlock language={lang} code={String(children).replace(/\n$/, '')} />
     }
     return (
-      <code className="font-mono text-xs bg-[#1e1e1e] px-1.5 py-0.5 rounded text-[#e879f9] border border-[#262626]">
+      <code className="font-mono text-xs bg-[var(--bg-input)] px-1.5 py-0.5 rounded text-[var(--code-inline)] border border-[var(--border)]">
         {children}
       </code>
     )
@@ -38,7 +40,7 @@ const markdownComponents: Components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#7c3aed] underline underline-offset-2 hover:text-[#a78bfa] transition-colors"
+        className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent-light)] transition-colors"
       >
         {children}
       </a>
@@ -53,27 +55,39 @@ const markdownComponents: Components = {
   },
   th({ children }) {
     return (
-      <th className="border border-[#262626] px-3 py-2 text-left text-[#a3a3a3] font-medium bg-[#1a1a1a]">
+      <th className="border border-[var(--border)] px-3 py-2 text-left text-[var(--text-secondary)] font-medium bg-[var(--bg-hover)]">
         {children}
       </th>
     )
   },
   td({ children }) {
     return (
-      <td className="border border-[#262626] px-3 py-2 text-[#e4e4e4]">
+      <td className="border border-[var(--border)] px-3 py-2 text-[var(--text-primary)]">
         {children}
       </td>
     )
   },
   blockquote({ children }) {
     return (
-      <blockquote className="border-l-2 border-[#7c3aed] pl-4 my-2 text-[#a3a3a3] italic">
+      <blockquote className="border-l-2 border-[var(--accent)] pl-4 my-2 text-[var(--text-secondary)] italic">
         {children}
       </blockquote>
     )
   },
   hr() {
-    return <hr className="border-none border-t border-[#262626] my-4" />
+    return <hr className="border-none border-t border-[var(--border)] my-4" />
+  },
+  img({ src, alt }) {
+    return (
+      <a href={src} target="_blank" rel="noopener noreferrer" className="block my-3">
+        <img
+          src={src}
+          alt={alt ?? ''}
+          loading="lazy"
+          className="max-w-full max-h-[400px] rounded-lg border border-[var(--border)] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+        />
+      </a>
+    )
   },
 }
 
@@ -82,11 +96,7 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
   const isUser = message.role === 'user'
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(message.content)
-    } catch {
-      // clipboard API unavailable
-    }
+    await copyToClipboard(message.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [message.content])
@@ -95,17 +105,15 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
     return (
       <div className="group flex justify-end px-4 py-3 animate-fade-in will-change-transform">
         <div className="flex flex-col items-end gap-1 max-w-[88%] min-w-0">
-          {/* User bubble — no avatar, right-aligned */}
-          <div className="relative px-4 py-3 rounded-[12px] text-sm leading-relaxed break-words bg-[#7c3aed]/15 border border-[#7c3aed]/25 text-[#f5f5f5]">
-            {/* Attached files */}
+          <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words bg-[var(--accent)]/15 border border-[var(--accent)]/25 text-[var(--text-primary)]">
             {message.files && message.files.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {message.files.map((f, i) => (
                   <span
                     key={i}
-                    className="text-[11px] px-2 py-0.5 rounded bg-[#262626] text-[#a3a3a3] max-w-[160px] truncate"
+                    className="text-[11px] px-2 py-0.5 rounded bg-[var(--border)] text-[var(--text-secondary)] max-w-[160px] truncate"
                   >
-                    📎 {f.split('/').pop()}
+                    {fileIcon(f.split('/').pop() ?? f)} {f.split('/').pop()}
                   </span>
                 ))}
               </div>
@@ -113,18 +121,16 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
             <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
 
-          {/* Hover actions below — copy + time */}
-          <div className="flex items-center gap-1.5 flex-row-reverse opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <div className="flex items-center gap-1.5 flex-row-reverse hover-hide">
             <button
               onClick={handleCopy}
               title="Копировать"
-              className="flex items-center gap-1 text-[11px] text-[#525252] hover:text-[#a3a3a3] transition-colors p-1 rounded hover:bg-[#1a1a1a]"
+              className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--bg-hover)]"
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
             </button>
-
             {message.created_at && (
-              <span className="flex items-center gap-0.5 text-[10px] text-[#3a3a3a]">
+              <span className="flex items-center gap-0.5 text-[10px] text-[var(--text-muted)]">
                 <Clock size={9} />
                 {formatTime(message.created_at)}
               </span>
@@ -135,66 +141,57 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
     )
   }
 
-  // Assistant message
   return (
     <div className="group relative flex gap-3 px-4 py-3 animate-fade-in will-change-transform">
-      {/* NeuraIcon avatar */}
       <div className="shrink-0 mt-0.5 select-none">
         <NeuraIcon size={28} />
       </div>
 
-      {/* Content */}
       <div className="flex flex-col gap-1 max-w-[88%] min-w-0 items-start">
-        <div className="relative px-4 py-3 rounded-[12px] text-sm leading-relaxed break-words bg-[#141414] border border-[#262626] border-l-2 border-l-[#7c3aed]/30 text-[#e4e4e4]">
-          {/* Hover toolbar — top-right of the message */}
-          <div className="absolute -top-7 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-[#1e1e1e] border border-[#262626] rounded-[6px] px-1.5 py-0.5 shadow-lg">
+        <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-[var(--text-primary)]">
+          <div className="absolute -top-7 right-0 z-10 flex items-center gap-1 hover-hide bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-1.5 py-0.5 shadow-lg">
             <button
               onClick={handleCopy}
               title="Копировать"
-              className="flex items-center gap-1 text-[11px] text-[#525252] hover:text-[#a3a3a3] transition-colors p-1 rounded hover:bg-[#262626]"
+              className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--border)]"
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
             </button>
-
             {isLast && onRegenerate && (
               <button
                 onClick={onRegenerate}
                 title="Перегенерировать"
-                className="flex items-center gap-1 text-[11px] text-[#525252] hover:text-[#a3a3a3] transition-colors p-1 rounded hover:bg-[#262626]"
+                className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--border)]"
               >
                 <RefreshCw size={11} />
               </button>
             )}
-
             {message.created_at && (
-              <span className="flex items-center gap-0.5 text-[10px] text-[#3a3a3a] px-1">
+              <span className="flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] px-1">
                 <Clock size={9} />
                 {formatTime(message.created_at)}
               </span>
             )}
-
             {message.duration_sec != null && (
-              <span className="text-[10px] text-[#3a3a3a]">
+              <span className="text-[10px] text-[var(--text-muted)]">
                 {message.duration_sec.toFixed(1)}s
               </span>
             )}
           </div>
 
-          {/* Attached files */}
           {message.files && message.files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {message.files.map((f, i) => (
                 <span
                   key={i}
-                  className="text-[11px] px-2 py-0.5 rounded bg-[#262626] text-[#a3a3a3] max-w-[160px] truncate"
+                  className="text-[11px] px-2 py-0.5 rounded bg-[var(--border)] text-[var(--text-secondary)] max-w-[160px] truncate"
                 >
-                  📎 {f.split('/').pop()}
+                  {f.split('/').pop()}
                 </span>
               ))}
             </div>
           )}
 
-          {/* Message content — markdown */}
           <div className="prose-neura">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {message.content}

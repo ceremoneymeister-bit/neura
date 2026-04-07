@@ -1,0 +1,69 @@
+id: dmitry_rostovcev
+name: Нейра (тест)
+owner:
+  name: Дмитрий Ростовцев
+  telegram_id: 1260958591
+telegram:
+  bot_token: ${DMITRY_BOT_TOKEN}
+  features:
+    streaming: true
+    voice_input: true
+    file_tools: true
+    proactive: false  # disabled 2026-04-07: fires after every restart (dedup in-memory only)
+    btw_queue: true
+claude:
+  model: sonnet
+  effort: high
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+  - Edit
+  - WebSearch
+  - WebFetch
+  - Bash(python3|ls|mkdir|cat)
+  system_prompt: dmitry/SYSTEM.md
+skills:
+- copywriting
+- smart-response
+- russian-typography
+- headline-lab
+- notion-pdf
+- pdf-reader
+- word-docx
+- excel-xlsx
+- ppt-generator
+- pdf-generator
+- content-creator
+- social-content
+- brand-voice-clone
+- brainstorming
+- decision-lab
+- nano-banana-pro
+- image-processing
+- google-oauth
+memory:
+  diary_retention_days: 90
+  max_long_term_entries: 500
+  context_window:
+    today_diary: 20
+    recent_days: 30
+    recent_per_day: 5
+    learnings_chars: 5000
+    corrections_chars: 5000
+    diary_chars: 30000
+    diary_user_chars: 300
+    diary_bot_chars: 400
+heartbeat:
+- name: security_audit
+  message: "🔒 Запусти security audit: python3 /opt/neura-v2/scripts/security-audit.py"
+  schedule: "monday 10:00"
+  enabled: true
+- name: weekly_checkin
+  message: "📊 Еженедельный чекин: проверь дашборд капсул и статус клиентов"
+  schedule: "monday 09:00"
+  enabled: true
+rate_limit:
+  max_per_day: 500
+  warn_at: 400

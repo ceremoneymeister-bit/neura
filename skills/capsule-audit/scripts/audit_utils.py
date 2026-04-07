@@ -111,7 +111,8 @@ def validate_bot_token(token):
 class TelethonTester:
     """Telethon userbot for sending test messages and receiving bot replies."""
 
-    SESSION = "/root/Antigravity/.secrets/telegram_userbot_parser"
+    SESSION = os.environ.get("TELETHON_SESSION", os.path.join(
+        os.environ.get("NEURA_BASE", "/opt/neura-v2"), "data", "telegram_userbot_parser"))
     API_ID = 33869550
     API_HASH = "bcc80776767204e74d728936e1e124a3"
 
@@ -326,7 +327,7 @@ def check_recent_errors(capsule, window_minutes=10):
 # ─── Path resolution ────────────────────────────────────────────────
 
 # Project root (Antigravity dir)
-PROJECT_ROOT = Path("/root/Antigravity")
+PROJECT_ROOT = Path(os.environ.get("NEURA_BASE", "/opt/neura-v2"))
 
 
 def resolve_capsule_path(path):

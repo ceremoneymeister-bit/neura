@@ -12,6 +12,17 @@ source: internal
 usage_count: 1
 last_used: 2026-04-01
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: silence
+proactive_trigger_1_condition: "7 дней без контакта с клиентом"
+proactive_trigger_1_action: "предложить follow-up сообщение"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "понедельник 10:00"
+proactive_trigger_2_action: "обзор клиентов без контакта"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Smart Outreach — проактивная коммуникация в Telegram
@@ -423,3 +434,9 @@ python3 engine.py time-check
 3. В `proactive.py` добавить `outreach_check` тип
 4. Создать `data/outreach/` в капсуле для tracker + profiles
 5. В CLAUDE.md капсулы добавить скилл в таблицу маршрутизации
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -1,315 +1,474 @@
 ---
 name: course-platform-builder
-description: Создание обучающей платформы ('свой GetCourse') под ключ. Используй при запросах: обучающая платформа, курсы, LMS, онлайн-школа, 'сделай как GetCourse', платформа для уроков.
-version: 2.0.0
+description: Full-stack course platform builder. Covers frontend (React+Vite+Tailwind), backend (Express+PostgreSQL+Redis), auth (JWT+bcrypt), video pipeline (HLS+AES-128), admin panel, deployment (nginx+systemd+SSL), and migration. Use for: обучающая платформа, курсы, LMS, онлайн-школа, 'свой GetCourse'.
+version: 3.0.0
 author: Дмитрий Ростовцев
 created: 2026-03-17
-updated: 2026-04-01
+updated: 2026-04-02
 category: development
-tags: [lms, course-platform, react, education, getcourse-alternative]
+tags: [lms, course-platform, react, express, postgresql, hls, video-encryption]
 risk: safe
-usage_count: 1
-last_used: 2026-04-01
-maturity: seed
+usage_count: 4
+last_used: 2026-04-02
+maturity: tested
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "клиент просит обучающую платформу/LMS"
+proactive_trigger_1_action: "запустить Full-Stack Playbook"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
-# course-platform-builder
+# course-platform-builder v3 — Full-Stack Playbook
 
 ## Purpose
 
-Быстрое создание кастомизируемой обучающей платформы (аналог GetCourse/Teachable) на собственном хостинге. Шаблон клонируется из `projects/course-platform/`, кастомизируется под клиента за 1 сессию.
+Создание полноценной обучающей платформы (аналог GetCourse/Teachable) с нуля за 1-2 сессии. Фронтенд + бэкенд + БД + auth + защищённое видео + деплой.
 
 ## When to Use
 
-- Клиент просит "обучающую платформу" / "онлайн-школу" / "платформу для курсов"
-- Нужна альтернатива GetCourse/Teachable на собственном хостинге
-- Запрос "сделай как GetCourse, но своё"
-- Любой проект с видеоуроками, модулями, прогрессом
+- Клиент просит "обучающую платформу" / "онлайн-школу"
+- Нужна альтернатива GetCourse на собственном хостинге
+- Проект с видеоуроками, модулями, прогрессом, оплатой
 
-## Стек (фиксированный)
+## Reference Implementation
 
-- React 19.2 + Vite 7.3 + Tailwind CSS 4.1 + Framer Motion 12
-- react-router-dom v7 (SPA)
-- Lucide React (иконки)
-- Деплой: FTP на REG.ru
-- **Ноль дополнительных зависимостей**
-
-## Proactive Excellence — ОБЯЗАТЕЛЬНО на каждом шаге
-
-Каждая фаза = не минимум, а инвестиция. Мы НЕ делаем "рабочий прототип" — мы делаем продукт, который продаёт.
-
-### Принципы проактивности
-
-1. **Anticipate** — на каждом шаге спрашивай себя: "что ещё нужно, о чём не попросили?"
-2. **Elevate** — не стоковые фразы, а конкретные под нишу. Не generic карточки, а wow-секции
-3. **Verify** — скриншоты 390/430/1440 после КАЖДОГО визуального изменения. Читать через Read tool
-4. **Audit** — после сборки автоматически: landing-audit (контраст, SEO, copy), не ждать пока попросят
-5. **Iterate** — показал → получил фидбэк → улучшил. Не "готово, принимай"
-
-### Чеклист проактивности (перед каждой отдачей результата)
-
-| # | Проверка | Как |
-|---|---------|-----|
-| 1 | **Copy quality** — заголовки по 4U? Feature→Benefit→Outcome? | Прогнать headline-lab мысленно |
-| 2 | **CTA stress** — CTA соответствует температуре трафика? | CTA Stress Matrix (НЕЧ20) |
-| 3 | **Psychology triggers** — есть social proof, authority, risk reversal? | marketing-psychology PLFS |
-| 4 | **Consistency** — FAQ↔Pricing↔Hero↔CTA используют одни термины? | Grep по хардкоду названий |
-| 5 | **Visual** — контраст ≥4.5:1, hover states, mobile OK? | Playwright screenshots |
-| 6 | **Data integrity** — нет placeholder данных, дублей, негативных отзывов? | Grep example.ru, дубли фраз |
-| 7 | **Product ladder** — есть ≥3 уровня, lead magnet → tripwire → main? | product-ladder скилл |
-| 8 | **Wow-момент** — есть хотя бы 1 интерактивный/неожиданный элемент? | UX принцип "Восторг" |
-| 9 | **About author** — автор представлен, есть доверие? | Секция с фото + регалии |
-| 10 | **Numbers** — конкретные цифры (уроки, часы, ученики, опыт)? | Минимум 3 числа на странице |
-
-### Автоматические действия после Фазы 4
-
-- `npm run build` OK → **автоматически** запустить мини-аудит: контраст text-muted, placeholder grep, FAQ consistency
-- Обнаружил проблему → **исправить сразу**, не спрашивая
-- Всё чисто → предложить 2-3 улучшения из чеклиста выше (не навязывать, а показать возможности)
+`/root/Antigravity/projects/course-platform/` — шаблон (Семён Пискунов, «Тренировочное место»)
 
 ---
 
-## Workflow: создание платформы
+## Стек (фиксированный)
+
+### Frontend
+- React 19 + Vite 7 + Tailwind CSS 4
+- react-router-dom v7, Lucide React, Framer Motion
+- hls.js (видео)
+
+### Backend
+- Express.js 4, Node.js 22+
+- PostgreSQL 16 (pg), Redis 7 (ioredis)
+- bcrypt, jsonwebtoken, cors, helmet, cookie-parser, express-rate-limit
+- multer (upload)
+
+### System
+- nginx (reverse proxy + HLS segment serving)
+- systemd (process management)
+- FFmpeg + OpenSSL (video HLS+AES-128 encryption)
+- certbot (SSL)
+
+---
+
+## Proactive Excellence — на каждом шаге
+
+| # | Проверка | Как |
+|---|---------|-----|
+| 1 | Copy quality (4U заголовки, Feature→Benefit→Outcome) | headline-lab |
+| 2 | CTA stress ↔ температура трафика | CTA Stress Matrix |
+| 3 | Psychology triggers (social proof, authority, risk reversal) | PLFS |
+| 4 | Consistency (FAQ↔Pricing↔Hero↔CTA — одни термины) | Grep |
+| 5 | Visual (контраст ≥4.5:1, hover states, mobile OK) | Playwright |
+| 6 | Data integrity (нет placeholder, дублей, негативных отзывов) | Grep |
+| 7 | Product ladder (≥3 уровня: lead magnet→main→premium) | product-ladder |
+| 8 | Wow-момент (интерактив, анимация) | UX "Восторг" |
+| 9 | About author (фото, регалии, доверие) | Секция |
+| 10 | Numbers (конкретные цифры: уроки, часы, ученики) | Min 3 числа |
+
+---
+
+## Workflow: 8 фаз от нуля до production
 
 ### Фаза 1: Сбор требований (5 мин)
 
-Спросить у клиента / Дмитрия:
+Спросить:
+1. Название платформы, автор, описание
+2. Акцентный цвет (hex), логотип
+3. Контакты: telegram, email, домен
+4. Структура курса: направления, модули, уроки, длительности
+5. Тарифы: названия, цены, фичи, какие уроки бесплатные
+6. Есть ли ЮKassa/Robokassa аккаунт?
+7. Домен + хостинг (VPS/shared)
 
-1. **Название платформы** → `config.js → SITE.name`
-2. **Акцентный цвет** → `config.js → SITE.accent` + `index.css → --color-accent`
-3. **Контакты** → telegram, email
-4. **Структура курса** → сколько модулей, уроков, тип контента
-5. **Тарифы** → сколько планов, цены, что включено
-6. **Домен** → для деплоя
-7. **Тема** → светлая (по умолчанию) или тёмная
+### Фаза 2: Frontend (шаблон)
 
-### Фаза 2: Клонирование шаблона (1 мин)
-
+**Клонировать шаблон:**
 ```bash
 cp -r projects/course-platform/ projects/Producing/{Client}/platform/
-cd projects/Producing/{Client}/platform/
-npm install
+cd projects/Producing/{Client}/platform/ && npm install
 ```
 
-### Фаза 3: Кастомизация (10-20 мин)
-
-Файлы для изменения (в порядке приоритета):
+**Кастомизация (порядок):**
 
 | # | Файл | Что менять |
 |---|------|-----------|
-| 1 | `src/config.js` | name, subtitle, author, accent, telegram, email, domain |
-| 2 | `src/index.css` | --color-accent, --color-accent-light в @theme |
-| 3 | `src/data/courses.js` | Реальная структура курса клиента |
-| 4 | `src/data/pricing.js` | Тарифы с реальными ценами |
-| 5 | `src/data/testimonials.js` | Реальные отзывы (или удалить секцию) |
-| 6 | `public/favicon.svg` | Логотип клиента |
-| 7 | Landing-секции | Тексты Hero, Problems, ForWhom под нишу клиента |
+| 1 | `src/config.js` | name, author, accent, telegram, email, domain, API_BASE |
+| 2 | `src/index.css` | --color-accent* в @theme |
+| 3 | `src/data/courses.js` | Реальная структура курса |
+| 4 | `src/data/pricing.js` | Тарифы с ценами |
+| 5 | `src/data/testimonials.js` | Отзывы (или удалить секцию) |
+| 6 | `public/` | Логотип, фото, favicon |
+| 7 | Landing-секции | Hero, Problems, ForWhom под нишу |
 
-### Фаза 4: Верификация (5 мин)
-
-**Обязательный чеклист:**
-
-- [ ] `npm run dev` — все страницы открываются
-- [ ] `/` → лендинг с правильным брендингом
-- [ ] `/login` → ввод любых данных → редирект в `/cabinet`
-- [ ] Прямой переход `/cabinet` без авторизации → `/login`
-- [ ] `/cabinet/courses` → клик по курсу → модули → урок → видеоплеер
-- [ ] "Отметить как пройденный" → обновить страницу → прогресс сохранён
-- [ ] Hamburger-меню на мобильном
-- [ ] `npm run build` → без ошибок
-- [ ] `.htaccess` в `dist/`
-
-### Фаза 5: Деплой (2 мин)
-
-```bash
-npm run build
-python3 scripts/ftp-deploy.py --source dist/ --target /public_html/
-```
-
-## Архитектура
-
-### Маршруты
-
-| Путь | Страница | Auth |
-|------|----------|------|
-| `/` | LandingPage (8 секций) | Нет |
-| `/login` | LoginPage | Нет |
-| `/register` | RegisterPage | Нет |
-| `/payment` | PaymentPage | Нет |
-| `/cabinet` | DashboardPage | Да |
-| `/cabinet/courses` | CourseCatalogPage | Да |
-| `/cabinet/courses/:id` | CourseDetailPage | Да |
-| `/cabinet/courses/:id/lessons/:lid` | LessonPage (fullscreen) | Да |
-| `/cabinet/profile` | ProfilePage | Да |
-| `/admin` | AdminPage | Да |
-| `*` | NotFoundPage | Нет |
-
-### Ключевые паттерны
-
-**ProtectedRoute** — проверяет `localStorage.getItem('auth_token')`:
-```jsx
-function ProtectedRoute({ children }) {
-  const { isLoggedIn } = useAuth()
-  if (!isLoggedIn) return <Navigate to="/login" replace />
-  return children
-}
-```
-
-**CabinetLayout** — сайдбар + `<Outlet/>` для вложенных маршрутов. LessonPage ВНЕ layout (fullscreen).
-
-**Прогресс** — `localStorage` ключ `course_progress`, JSON `{lessonId: {completed, watchedSeconds}}`.
-
-**Единая точка кастомизации** — `config.js` → используется в навбарах, footer, hero.
-
-### Структура файлов (38 файлов)
+**Ключевые файлы фронтенда:**
 
 ```
 src/
-├── main.jsx, App.jsx, index.css, config.js
-├── data/ (courses, pricing, testimonials)
-├── lib/ (auth, progress)
-├── hooks/ (useAuth.jsx, useToast.jsx)
+├── lib/
+│   ├── api.js          ← fetch wrapper + auto-refresh JWT
+│   ├── auth.js         ← login/register/logout/restoreSession
+│   └── progress.js     ← markComplete/updateWatched/getDashboard
+├── hooks/
+│   └── useAuth.jsx     ← AuthProvider + useAuth hook (async + session restore)
 ├── components/
-│   ├── ui/ (Button, Card, Badge, Modal, FadeIn, VideoPlayer, Toast, ScrollToTop)
-│   ├── layout/ (PublicNavbar, CabinetLayout, CabinetSidebar, Footer)
-│   ├── landing/ (Hero, Problems, ForWhom, Program, Testimonials, Pricing, FAQ, CTA)
-│   └── cabinet/ (CourseCard, ModuleAccordion, LessonCard, ProgressBar)
-└── pages/ (10 страниц + NotFoundPage)
+│   ├── ui/VideoPlayer.jsx  ← hls.js + AES key auth + custom controls
+│   ├── cabinet/            ← CourseCard, LessonCard, ModuleAccordion, ProgressBar
+│   ├── landing/            ← Hero, Problems, ForWhom, Program, Testimonials, Pricing, FAQ, CTA
+│   └── layout/             ← PublicNavbar, CabinetSidebar, CabinetLayout, Footer
+├── pages/              ← Landing, Login, Register, Payment, Dashboard, Catalog, Detail, Lesson, Profile, Admin, NotFound
+└── config.js           ← SITE object + API_BASE
 ```
+
+**Vite proxy (dev):**
+```javascript
+// vite.config.js
+server: { proxy: { '/cp-api': { target: 'http://127.0.0.1:3001', changeOrigin: true } } }
+```
+
+### Фаза 3: Backend
+
+**Создать `backend/`:**
+```bash
+mkdir -p backend/src/{config,middleware,routes,services,db/migrations}
+```
+
+**package.json:**
+```json
+{
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21", "pg": "^8.13", "ioredis": "^5.4",
+    "bcrypt": "^5.1", "jsonwebtoken": "^9.0", "cors": "^2.8",
+    "helmet": "^8.0", "express-rate-limit": "^7.5", "dotenv": "^16.4",
+    "uuid": "^11.1", "multer": "^1.4", "cookie-parser": "^1.4"
+  }
+}
+```
+
+**Файлы бэкенда:**
+
+| Файл | Назначение |
+|------|-----------|
+| `server.js` | Entry: express + routes + middleware + helmet + cors + cookie-parser |
+| `src/config/database.js` | pg.Pool (connectionString из .env) |
+| `src/config/redis.js` | ioredis клиент (db index 2) |
+| `src/middleware/auth.js` | JWT Bearer verify, TOKEN_EXPIRED code |
+| `src/middleware/admin.js` | role === 'admin' check |
+| `src/middleware/errorHandler.js` | 23505→409, generic→500 |
+| `src/services/authService.js` | bcrypt(12), JWT sign/verify, refresh tokens (SHA-256 hash) |
+| `src/routes/auth.js` | register/login/refresh/logout + rate limiting |
+| `src/routes/courses.js` | GET courses, GET course/:id, GET lesson (+ access control) |
+| `src/routes/progress.js` | POST complete, PUT watch, GET dashboard |
+| `src/routes/profile.js` | GET/PUT profile, PUT password (+ revoke tokens) |
+| `src/routes/payments.js` | Заглушка → ЮKassa когда готова |
+| `src/routes/video.js` | GET playlist (rewrite key URL), GET key (signed token) |
+| `src/routes/admin.js` | GET stats, GET users, PUT user/plan |
+| `src/db/migrate.js` | File-based migration runner |
+| `src/db/seed.js` | Импорт из courses.js + pricing.js → PostgreSQL |
+
+### Фаза 4: Database
+
+**Создать БД:**
+```bash
+docker exec {postgres_container} psql -U {superuser} -d postgres -c "CREATE USER course_platform WITH PASSWORD '{password}';"
+docker exec {postgres_container} psql -U {superuser} -d postgres -c "CREATE DATABASE course_platform OWNER course_platform;"
+```
+
+**9 таблиц (5 миграций):**
+
+| Таблица | Ключевые колонки | Назначение |
+|---------|-----------------|-----------|
+| users | id UUID, email, password_hash, name, role, plan_id, plan_expires_at | Студенты + админы |
+| courses | id VARCHAR, title, subtitle, description, color, sort_order, is_active | Курсы |
+| modules | id, course_id FK, title, sort_order | Модули внутри курса |
+| lessons | id, module_id FK, title, duration, video_path, **is_free**, sort_order | Уроки (is_free — доступ без оплаты) |
+| plans | id, name, price (kopecks!), features JSONB | Тарифы |
+| payments | id UUID, user_id FK, plan_id FK, amount, status, yukassa_id | Платежи |
+| lesson_progress | user_id FK, lesson_id FK, completed, watched_seconds, UNIQUE(user+lesson) | Прогресс |
+| refresh_tokens | user_id FK, token_hash (SHA-256), expires_at | Refresh tokens |
+| video_keys | lesson_id FK UNIQUE, key_path, iv_hex | AES ключи для HLS |
+| _migrations | name UNIQUE, applied_at | Трекинг миграций |
+
+**Seed:** `npm run setup` = migrate + seed (courses.js + pricing.js → БД + admin user)
+
+### Фаза 5: Auth system
+
+**Токены:**
+- Access token: JWT, 15 мин, в памяти React (НЕ localStorage!)
+- Refresh token: random hex 64, 30 дней, httpOnly cookie, SHA-256 хэш в БД
+- Пароли: bcrypt, 12 rounds
+
+**Frontend api.js:**
+- Хранит accessToken в module-level variable
+- Interceptor: на 401+TOKEN_EXPIRED → POST /auth/refresh (cookie) → retry
+- Deduplicate concurrent refresh calls (refreshPromise singleton)
+
+**Access control:**
+```
+lesson.is_free → доступен всем зарегистрированным
+user.plan_id IN ('full','personal') AND NOT expired → все уроки
+иначе → 403 PLAN_REQUIRED
+```
+
+### Фаза 6: Video Pipeline
+
+**Конвертация (scripts/convert-video.sh):**
+```bash
+# Генерация AES-128 ключа
+openssl rand 16 > keys/{courseId}/{lessonId}/enc.key
+# FFmpeg: MP4 → encrypted HLS
+ffmpeg -i input.mp4 -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k \
+  -hls_time 10 -hls_list_size 0 -hls_playlist_type vod \
+  -hls_key_info_file keyinfo.txt \
+  -hls_segment_filename "media/hls/{courseId}/{lessonId}/seg_%04d.ts" \
+  media/hls/{courseId}/{lessonId}/playlist.m3u8
+```
+
+**Serving:**
+- GET `/cp-api/video/:lessonId/playlist` → backend переписывает EXT-X-KEY URI с signed JWT (5 мин TTL)
+- GET `/cp-api/video/key/:lessonId/:signedToken` → backend проверяет JWT, отдаёт 16-byte ключ
+- nginx: .ts сегменты раздаёт напрямую (зашифрованы), .m3u8/.key → deny
+
+**Frontend VideoPlayer.jsx:**
+```javascript
+// hls.js с auth token injection
+const hls = new Hls({
+  xhrSetup: (xhr, url) => {
+    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+  }
+})
+hls.loadSource(`/cp-api/video/${lessonId}/playlist`)
+hls.attachMedia(videoRef.current)
+```
+
+**Защита от скачивания (85-95%):**
+1. Сегменты зашифрованы AES-128 (бесполезны без ключа)
+2. Ключ по signed JWT (5 мин TTL)
+3. Плейлист через API (не напрямую)
+4. context menu disabled
+5. Не защищает от screen recording (DRM-level нужен для этого)
+
+### Фаза 7: Deployment
+
+**Структура на VPS:**
+```
+/opt/course-platform/
+├── backend/     ← Express.js + .env
+├── frontend/    ← Vite build output
+├── media/       ← originals/ + hls/{course}/{lesson}/
+└── keys/        ← AES ключи
+```
+
+**systemd:**
+```ini
+[Service]
+WorkingDirectory=/opt/course-platform/backend
+ExecStart=/usr/bin/node server.js
+MemoryMax=1G
+Restart=always
+```
+
+**nginx:**
+```nginx
+server {
+    server_name yourdomain.com;
+    location /cp-api/ { proxy_pass http://127.0.0.1:3001; }
+    location /hls/ {
+        alias /opt/course-platform/media/hls/;
+        location ~ \.(m3u8|key)$ { return 403; }
+    }
+    location / {
+        root /opt/course-platform/frontend;
+        try_files $uri /index.html;
+    }
+}
+```
+
+**SSL:** `certbot --nginx -d yourdomain.com`
+
+**Deploy script:**
+```bash
+cd /root/Antigravity/projects/{Client}/platform
+npm run build
+rsync -av --exclude=node_modules --exclude=.env backend/ /opt/course-platform/backend/
+rsync -av dist/ /opt/course-platform/frontend/
+systemctl restart course-platform
+```
+
+### Фаза 8: Migration (к клиенту)
+
+```bash
+# Export
+pg_dump course_platform > dump.sql
+tar czf export.tar.gz backend/ frontend/ media/ keys/ dump.sql nginx.conf service.conf
+# На сервере клиента
+tar xzf export.tar.gz && psql < dump.sql
+# Обновить .env (домен, пароли), nginx (домен, SSL), DNS
+```
+
+---
+
+## .env template (backend)
+
+```
+PORT=3001
+NODE_ENV=production
+DOMAIN=https://yourdomain.com
+DATABASE_URL=postgresql://course_platform:PASSWORD@127.0.0.1:5432/course_platform
+REDIS_URL=redis://127.0.0.1:6379/2
+JWT_SECRET=<openssl rand -hex 32>
+JWT_REFRESH_SECRET=<unused, можно убрать>
+MEDIA_DIR=/opt/course-platform/media
+KEYS_DIR=/opt/course-platform/keys
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_NAME=Admin
+ADMIN_PASSWORD=<openssl rand -base64 12>
+```
+
+---
+
+## API Endpoints (20 total)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | /cp-api/auth/register | No | {name, email, password} → {user, accessToken} + cookie |
+| POST | /cp-api/auth/login | No | {email, password} → {user, accessToken} + cookie |
+| POST | /cp-api/auth/refresh | No | cookie → {user, accessToken} + new cookie |
+| POST | /cp-api/auth/logout | Yes | Revoke all refresh tokens |
+| GET | /cp-api/courses | Yes | All courses + user progress |
+| GET | /cp-api/courses/:id | Yes | Course with modules/lessons + progress |
+| GET | /cp-api/courses/:id/lessons/:lid | Yes | Lesson + access check + prev/next |
+| POST | /cp-api/progress/:lessonId/complete | Yes | Mark lesson completed |
+| PUT | /cp-api/progress/:lessonId/watch | Yes | Update watched seconds |
+| GET | /cp-api/progress/dashboard | Yes | Stats + lastLesson + per-course progress |
+| GET | /cp-api/profile | Yes | User + plan info |
+| PUT | /cp-api/profile | Yes | Update name/email |
+| PUT | /cp-api/profile/password | Yes | Change password (revokes tokens) |
+| POST | /cp-api/payments/create | Yes | Create payment (stub → ЮKassa) |
+| POST | /cp-api/payments/webhook | No* | ЮKassa callback |
+| GET | /cp-api/payments/history | Yes | User's payments |
+| GET | /cp-api/video/:lid/playlist | Yes | Signed HLS playlist |
+| GET | /cp-api/video/key/:lid/:token | No* | AES key (token in URL) |
+| GET | /cp-api/admin/stats | Admin | Dashboard stats |
+| GET | /cp-api/admin/users | Admin | Users list + search + pagination |
+| PUT | /cp-api/admin/users/:id/plan | Admin | Assign plan manually |
+| GET | /cp-api/health | No | Server health check |
+
+---
 
 ## Ошибки из опыта (ИЗБЕГАТЬ!)
 
-### 1. JSX в .js файлах
-**Проблема:** `useAuth.js` содержал JSX (`<AuthContext.Provider>`), но расширение `.js`. Vite/Rollup не может парсить JSX в .js файлах.
-**Решение:** Файлы с JSX → расширение `.jsx`. Проверять ВСЕ файлы с JSX после создания.
-**Правило:** Если файл содержит `<` HTML-подобный синтаксис → `.jsx`
+### Frontend
+1. **JSX в .js файлах** → расширение `.jsx` для файлов с JSX
+2. **Хардкод цветов** → ТОЛЬКО тем-токены (text-text, bg-accent)
+3. **Рассогласование API** → создавать lib/ ПЕРВЫМИ, контракты в промпт
+4. **FAQ↔Pricing несоответствие** → единый источник данных для названий тарифов
+5. **Негативные отзывы** → каждый отзыв = проблема → результат
+6. **Config placeholder** → grep example.ru перед деплоем
+7. **Лого дубль** → навбар скрывает лого до скролла
+8. **Hero mobile** → раздельные bg для mobile/desktop, НИКОГДА cover
+9. **dynamic import api.js** → всегда static import
 
-### 2. Хардкод цветов вместо тем-токенов
-**Проблема:** Агенты генерировали `bg-indigo-500`, `text-gray-900` вместо `bg-accent`, `text-text`. При смене акцентного цвета — формы не меняются.
-**Решение:** В промптах для агентов ЯВНО указывать: "Используй ТОЛЬКО тем-токены: text-text, text-text-muted, bg-accent, bg-surface, border-border. НЕ используй gray-*, indigo-*, red-* и другие прямые цвета Tailwind."
-**Правило:** Грепнуть после создания: `grep -r "gray-\|indigo-\|red-\|green-\|blue-\|amber-" src/pages/`
+### Backend
+10. **Email validation** → regex на регистрации/логине
+11. **UUID validation** → перед каждым query по userId
+12. **Plan expiry** → ВСЕГДА проверять plan_expires_at при access control
+13. **Rate limiting** → обязательно на /register и /login
+14. **Token revocation** → при смене пароля → revokeUserTokens()
+15. **Admin password в .env** → убрать после первого запуска, использовать password reset
 
-### 3. Рассогласование API между lib/ и компонентами
-**Проблема:** `getCourseProgress(course.id)` в компоненте, но функция принимает `(modules)`. `getLessonProgress(courseId, lessonId)` но функция принимает только `(lessonId)`.
-**Решение:** Создавать lib/ файлы ПЕРВЫМИ, затем передавать точные сигнатуры в промпты для агентов.
-**Правило:** Всегда прочитать lib/ перед созданием компонентов. Включить JSDoc-сигнатуры в промпт.
+### Deploy
+16. **SSL cert paths** → certbot создаёт в /etc/letsencrypt/live/{domain}/
+17. **Nginx SNI** → добавить домен в stream map если используется SNI router
+18. **CORS domain** → обновить DOMAIN в .env при деплое
 
-### 4. sessionStorage vs localStorage для токенов
-**Проблема:** Токен в sessionStorage пропадал при закрытии вкладки, юзер-данные в localStorage оставались → несогласованное состояние.
-**Решение:** Использовать localStorage для обоих (token + user). Для реального бэкенда — httpOnly cookies.
+---
 
-### 5. Пропуск стоимости в виде строки
-**Проблема:** `plan.price = "2 990 ₽"` (строка с символом ₽). Код делал `plan.price.toLocaleString()` — ломался.
-**Решение:** Цены хранить как числа, форматировать при рендере. Или хранить как строку и НЕ форматировать.
-
-### 6. dangerouslySetInnerHTML для контента уроков
-**Проблема:** Агент использовал `dangerouslySetInnerHTML` для рендера текстового контента — XSS-уязвимость.
-**Решение:** Обычный текстовый рендер: `<p>{lesson.content}</p>` или `whitespace-pre-line`.
-
-### 7. Параллельные агенты и конфликты
-**Проблема:** 3 агента создавали файлы параллельно → разные стили, несовместимые API-вызовы.
-**Решение:** Создавать core (config, data, lib, hooks) в основном потоке ПЕРВЫМ. Агентам давать чёткие контракты (сигнатуры функций, доступные CSS-классы).
-
-### 8. FAQ↔Pricing рассогласование (01.04.2026)
-**Проблема:** FAQ называл тарифы "Базовый/Стандарт/Премиум", а Pricing — "Открытая тренировка/Полный доступ/С наставником". Пользователь видит разные названия.
-**Решение:** Единый источник данных для названий тарифов. FAQ.jsx должен импортировать из `data/pricing.js`, а не хардкодить.
-**Правило:** После создания Pricing — грепнуть по всем файлам на хардкод названий тарифов.
-
-### 9. Негативные и дублирующие отзывы
-**Проблема:** Отзыв "всё болит" без позитивного resolution пугает покупателя. Два отзыва содержали одну фразу — дублирование.
-**Решение:** Каждый отзыв = проблема → решение → результат. Грепнуть на дубли фраз.
-
-### 10. Config placeholder в проде
-**Проблема:** `config.js` содержал `info@example.ru`, `t.me/channel` — рендерилось в footer.
-**Решение:** Плейсхолдеры = build-time ошибка. Добавить проверку в pre-build.
-
-## Чеклист для агентов (копировать в промпт)
+## Чеклист для агентов
 
 ```
-ПРАВИЛА ДЛЯ ГЕНЕРАЦИИ КОМПОНЕНТОВ:
-- Расширение: .jsx для файлов с JSX, .js для чистого JS
-- Цвета: ТОЛЬКО тем-токены (text-text, bg-accent, border-border и т.д.)
-- ЗАПРЕЩЕНЫ: gray-*, indigo-*, red-*, green-*, blue-*, amber-* из Tailwind
-- CSS-классы: использовать .card, .btn, .btn-primary, .btn-ghost, .input, .nav-link
-- Импорты: useAuth из '../hooks/useAuth.jsx' (НЕ .js)
-- Auth API: login(email, password), register(name, email, password), logout()
-- Progress API: getCourseProgress(modules) → {total, completed, percent}
-  getLessonProgress(lessonId) → {completed, watchedSeconds}
-  markLessonCompleted(lessonId)
-  getLastLesson(courseId, modules) → lesson object
-- Courses API: getCourse(courseId), getLesson(courseId, lessonId),
-  getAllLessons(courseId), getAdjacentLessons(courseId, lessonId)
-- Роутер: Link from 'react-router-dom', useParams, useNavigate
-- Анимации: FadeIn from '../components/ui/FadeIn.jsx' (delay prop)
+ПРАВИЛА ДЛЯ ГЕНЕРАЦИИ:
+- Расширение: .jsx для файлов с JSX
+- Цвета: ТОЛЬКО тем-токены (text-text, bg-accent, border-border)
+- ЗАПРЕЩЕНЫ: gray-*, indigo-* и другие прямые цвета Tailwind
+- Auth: useAuth() hook, НЕ localStorage напрямую
+- API: import { api } from '../lib/api.js', НЕ fetch напрямую
+- Progress: import { markLessonCompleted, updateWatchedSeconds } from '../lib/progress.js'
+- Анимации: FadeIn from '../components/ui/FadeIn.jsx'
 - Иконки: из 'lucide-react'
+- Видео: VideoPlayer принимает lessonId, НЕ src
 ```
 
-### 8. Лого дублируется в Hero и Navbar
-**Проблема:** Логотип показывается и в навбаре и в hero-заголовке → визуальный мусор, особенно на мобиле.
-**Решение:** Если hero содержит заголовок-лого (градиентный текст или изображение) → навбар скрывает лого до скролла: `className={scrolled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`.
-**Правило:** Лого в навбаре появляется ТОЛЬКО при скролле (когда hero уходит за пределы экрана).
+---
 
-### 9. Hero с фоновым изображением — мобильная адаптация
-**Проблема:** background-image на мобиле показывает не ту часть изображения (горшок вместо человека). Или изображение уменьшается/обрезается.
-**Решение:** РАЗДЕЛЬНЫЕ background для mobile и desktop:
-```jsx
-{/* Desktop */}
-<div className="hidden sm:block absolute inset-0" style={{
-  backgroundImage: 'url(...)', backgroundSize: 'auto 100%', backgroundPosition: 'right center'
-}} />
-{/* Mobile — другой position */}
-<div className="sm:hidden absolute inset-0" style={{
-  backgroundImage: 'url(...)', backgroundSize: 'auto 100%', backgroundPosition: '58% center'
-}} />
-```
-**Правило:** НИКОГДА `background-size: cover/contain` для hero с человеком на мобиле. Всегда `auto 100%` + точный position. Проверять Playwright-скриншотами на 390px и 430px.
+## Верификация (каждая фаза)
 
-### 10. Заголовок обрезается — leading и overflow
-**Проблема:** `leading-[0.85]` обрезает нижние элементы букв (descenders). CSS gradient text особенно чувствителен.
-**Решение:** Минимум `leading-[1]` для gradient text. Без `overflow-hidden` на контейнере заголовка.
+```bash
+# Фаза 3: Backend
+curl localhost:3001/cp-api/health  # → {status: ok}
 
-### 11. Не уменьшать фоновое изображение клиента
-**Проблема:** Клиент создал изображение специально под hero (1920×1080). Агент уменьшил его до 70% высоты → "обрубленное".
-**Решение:** Если клиент дал hero-изображение → `background-size: auto 100%` (полная высота ВСЕГДА). Сдвигать через position, НЕ уменьшать через size.
+# Фаза 4: Database
+npm run setup  # → Applied: 001-005, Seed: 4 courses, 18 lessons, 3 plans
 
-### 12. CSS gradient text вместо логотипа-картинки
-**Проблема:** PNG-логотип не масштабируется, размывается при увеличении.
-**Решение:** Воспроизвести логотип CSS-градиентом:
-```jsx
-<span style={{
-  background: 'linear-gradient(180deg, #F0C060 0%, #E4AB70 40%, #E17912 100%)',
-  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-}}>ЗАГОЛОВОК</span>
-```
-**Правило:** Если лого — это стилизованный текст → CSS gradient. Если лого — иконка/графика → PNG/SVG.
+# Фаза 5: Auth
+curl -X POST localhost:3001/cp-api/auth/register -H "Content-Type: application/json" \
+  -d '{"name":"Test","email":"test@test.ru","password":"123456"}'
+# → 201 + {user, accessToken}
 
-### 13. Marquee/бегущая строка для категорий
-**Паттерн:** Дублировать массив 3 раза, `translateX(-33.333%)` за 20s:
-```jsx
-const marqueeItems = [...items, ...items, ...items]
-// animation: marquee 20s linear infinite
-// @keyframes marquee { 0% { translateX(0) } 100% { translateX(-33.333%) } }
+# Фаза 6: Video
+bash scripts/convert-video.sh sample.mp4 test test-1
+# → seg_0000.ts (encrypted), playlist.m3u8 with EXT-X-KEY
+
+# Фаза 7: Deploy
+curl -sk --resolve yourdomain:443:127.0.0.1 https://yourdomain/cp-api/health
+# → {status: ok}
+
+# Полный flow
+npm run build  # frontend
+systemctl restart course-platform  # backend
 ```
 
-### 14. ОБЯЗАТЕЛЬНО: Playwright-скриншоты перед отдачей
-**Правило:** После КАЖДОГО визуального изменения — скриншоты 390px + 430px + 1440px. Прочитать через Read tool. Проверить что всё ОК. Только потом показывать Дмитрию.
+---
 
-## Будущие фазы (бэклог)
+## Changelog
 
-| Фаза | Что | Зависимости |
-|------|-----|-------------|
-| Backend | Express + SQLite, JWT, реальная авторизация | Сервер |
-| Payments | ЮKassa/Robokassa webhook | Backend |
-| Video | FFmpeg → HLS + nginx + hls.js | Сервер, ffmpeg |
-| Notifications | Telegram бот (регистрация, оплата) | Bot token |
-| Analytics | Реальные данные в AdminPage | Backend |
-| Certificates | PDF-генерация по завершении курса | Backend |
-| Search | Поиск по курсам/урокам | — |
-| A11y | ARIA-labels, keyboard nav, contrast | — |
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
 
-## References
+### 2026-03-17 — скелет платформы + первый аудит
+- Реализован скелет (38 файлов, React+Vite+TW4, 10 маршрутов, landing+кабинет+admin)
+- Аудит: 8 багов, 3 critical (тем-токены, auth persistence, video tracking)
+- Урок: ВСЕГДА проводить аудит после генерации скелета — critical баги в 100% случаев
 
-Детальная документация в `references/`:
-- `architecture.md` — подробная архитектура и data flow
-- `errors-log.md` — полный лог ошибок с контекстом
-- `customization-checklist.md` — чеклист кастомизации под клиента
+### 2026-04-01 — кастомизация под «Тренировочное место»
+- Полная кастомизация: dark→light (#F5F4F0/#201712/#E4AB70), golden gradient CTA, Oswald uppercase
+- Hero: 12 итераций (v1→v12) — фоновое фото + текст поверх на mobile = основная проблема
+- Решение: раздельные bg для mobile/desktop, CSS gradient text заголовок, marquee бегущая строка
+- Антипаттерн: background-size cover на hero с человеком = обрезает на mobile. Использовать contain + position tuning
+- Антипаттерн: логотип в navbar + hero = дубль. Скрывать navbar logo до скролла
+- Антипаттерн: НЕ уменьшать на mobile — position split (текст вверху, фото внизу)
+- Урок: ВСЕГДА верифицировать скриншотами (Playwright) на 3 viewport (390/430/1440)
+
+### 2026-04-01 — конструктор занятий v2
+- 3 концепции (Interactive Picker + Weekly Grid + Accordion Details) вместо фото (однотипные)
+- Иконки вместо фото (Leaf/Dumbbell/Wind/Zap) — решение проблемы плохого фотоконтента
+- Добавлена секция Proactive Excellence (10-point checklist) в SKILL.md
+- Урок: если фото клиента однотипны → переходить на иконки/иллюстрации
+
+### 2026-04-02 — архитектурное проектирование + тотальный аудит + v3
+- Архитектура: Express+SQLite на VPS, SPA на REG.ru. 7 таблиц, 12 API endpoints, YouTube unlisted, ЮKassa
+- Тотальный аудит (3 параллельных агента): Backend 6C/8H/11M/9L, Frontend 0C/0H/1M/1L
+- Пофикшено: email validation, rate limiting, plan expiry check, token revocation
+- SKILL.md полностью переписан v2→v3 (full-stack playbook, 8 фаз)
+- Антипаттерн: dynamic import() для api.js в React = race condition. ТОЛЬКО static import
+- Антипаттерн: plan_expires_at ВСЕГДА проверять при access control
+- Урок: всегда предлагать 2-3 варианта архитектуры с trade-offs перед стартом

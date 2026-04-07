@@ -3,6 +3,14 @@ name: react-best-practices
 description: "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance pat..."
 risk: unknown
 source: community
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "создание/рефакторинг React компонента"
+proactive_trigger_1_action: "проверить по чеклисту"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Vercel React Best Practices
@@ -167,3 +175,9 @@ For the complete guide with all rules expanded: `AGENTS.md`
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

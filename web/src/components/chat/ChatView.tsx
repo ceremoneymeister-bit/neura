@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Message } from '@/api/conversations'
-import { getMessages, updateConversation } from '@/api/conversations'
+import { getMessages, updateConversation, listConversations } from '@/api/conversations'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import type { WsChunk } from '@/hooks/useWebSocket'
 import { MessageList } from './MessageList'
 import { StreamingMessage } from './StreamingMessage'
 import { ChatInput } from './ChatInput'
+import { SuggestionCards } from './SuggestionCards'
 
 interface ChatViewProps {
   conversationId: string
@@ -22,9 +23,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [showScrollBottom, setShowScrollBottom] = useState(false)
   const [autoTitleDone, setAutoTitleDone] = useState(false)
+  const [conversationModel, setConversationModel] = useState<string | undefined>(undefined)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastUserTextRef = useRef<string>('')
+  const pendingSentRef = useRef(false)
+  const queuedMessageRef = useRef<{ text: string; files: string[]; model?: string } | null>(null)
+  const sendRef = useRef<(text: string, files: string[], model?: string) => void>(() => {})
   const convId = parseInt(conversationId, 10)
 
   // ── WebSocket message handler ─────────────────────────────────
@@ -50,6 +55,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
         setStatusText(null)
         setToolText(null)
         break
+      case 'busy':
+        setError(chunk.content)
+        break
     }
   }, [])
 
@@ -69,13 +77,72 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setStatusText(null)
     setToolText(null)
     setIsStreaming(false)
+
+    // Send queued message if any
+    const queued = queuedMessageRef.current
+    if (queued) {
+      queuedMessageRef.current = null
+      // Small delay to let state settle
+      setTimeout(() => {
+        sendRef.current(queued.text, queued.files, queued.model)
+        setIsStreaming(true)
+        lastUserTextRef.current = queued.text
+      }, 100)
+    }
   }, [])
 
-  const { send } = useWebSocket({
+  const { send, sendCancel, status: wsStatus } = useWebSocket({
     conversationId: isNaN(convId) ? null : convId,
     onMessage: handleMessage,
     onDone: handleDone,
   })
+
+  // Keep ref in sync for queued message dispatch
+  sendRef.current = send
+
+  // ── Check for pending message from welcome screen ─────────────
+
+  useEffect(() => {
+    if (wsStatus !== 'connected' || pendingSentRef.current) return
+
+    const key = `pending_msg_${convId}`
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return
+
+    sessionStorage.removeItem(key)
+    pendingSentRef.current = true
+
+    try {
+      const { text, files } = JSON.parse(raw) as { text: string; files: string[] }
+      if (!text && (!files || files.length === 0)) return
+
+      // Add user message to UI
+      const userMsg: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: text,
+        files: files || [],
+        model: null,
+        duration_sec: null,
+        tokens_used: null,
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, userMsg])
+      lastUserTextRef.current = text
+
+      // Auto-title
+      if (!autoTitleDone) {
+        setAutoTitleDone(true)
+        const title = text.length > 60 ? text.slice(0, 60) + '\u2026' : text
+        updateConversation(convId, { title }).catch(() => undefined)
+        document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title } }))
+      }
+
+      send(text, files || [])
+    } catch {
+      // ignore parse errors
+    }
+  }, [wsStatus, convId, send, autoTitleDone])
 
   // ── Load messages on conversationId change ────────────────────
 
@@ -88,30 +155,57 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setError(null)
     setAutoTitleDone(false)
     setShowScrollBottom(false)
+    pendingSentRef.current = false
 
     if (isNaN(convId)) return
 
     setIsLoading(true)
+
+    // Load conversation model preference
+    listConversations()
+      .then((convs) => {
+        const conv = convs.find((c) => c.id === convId)
+        if (conv?.model) setConversationModel(conv.model)
+      })
+      .catch(() => {})
+
     getMessages(convId)
       .then((msgs) => {
         setMessages(msgs)
-        // If there are existing messages, mark auto-title as done
-        if (msgs.length > 0) setAutoTitleDone(true)
+        if (msgs.length > 0) {
+          setAutoTitleDone(true)
+          // Emit first user message as title for top bar
+          const firstUser = msgs.find((m) => m.role === 'user')
+          if (firstUser) {
+            const t = firstUser.content.length > 60 ? firstUser.content.slice(0, 60) + '\u2026' : firstUser.content
+            document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title: t } }))
+          }
+        }
       })
       .catch(() => setError('Не удалось загрузить сообщения'))
       .finally(() => setIsLoading(false))
   }, [convId])
 
+  // ── Auto-dismiss error after 8s ─────────────────────────────────
+
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(null), 8000)
+    return () => clearTimeout(timer)
+  }, [error])
+
   // ── Auto-scroll ────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!showScrollBottom && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages, showScrollBottom])
+  const userScrolledUpRef = useRef(false)
 
   useEffect(() => {
-    if (isStreaming && scrollRef.current) {
+    if (!userScrolledUpRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
+    if (isStreaming && !userScrolledUpRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [streamingText, isStreaming])
@@ -120,6 +214,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     const el = scrollRef.current
     if (!el) return
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    userScrolledUpRef.current = distFromBottom > 120
     setShowScrollBottom(distFromBottom > 120)
   }
 
@@ -127,13 +222,30 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
+    userScrolledUpRef.current = false
     setShowScrollBottom(false)
   }
 
   // ── Send message ──────────────────────────────────────────────
 
-  const handleSend = useCallback(async (text: string, files: string[]) => {
-    if (isStreaming) return
+  const handleSend = useCallback(async (text: string, files: string[], model?: string) => {
+    // Queue message if currently streaming
+    if (isStreaming) {
+      queuedMessageRef.current = { text, files, model }
+      // Still show user message in chat immediately
+      const queuedMsg: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: text,
+        files,
+        model: null,
+        duration_sec: null,
+        tokens_used: null,
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, queuedMsg])
+      return
+    }
 
     const userMsg: Message = {
       id: Date.now(),
@@ -149,14 +261,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setError(null)
     lastUserTextRef.current = text
 
-    // Auto-title: set conversation title from first user message
     if (!autoTitleDone) {
       setAutoTitleDone(true)
-      const title = text.length > 60 ? text.slice(0, 60) + '…' : text
+      const title = text.length > 60 ? text.slice(0, 60) + '\u2026' : text
       updateConversation(convId, { title }).catch(() => undefined)
+      document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title } }))
     }
 
-    send(text, files)
+    setIsStreaming(true)
+    setStatusText('Думаю...')
+    send(text, files, model)
   }, [isStreaming, autoTitleDone, convId, send])
 
   // ── Regenerate last response ──────────────────────────────────
@@ -165,7 +279,6 @@ export function ChatView({ conversationId }: ChatViewProps) {
     if (isStreaming || !lastUserTextRef.current) return
 
     setMessages((prev) => {
-      // Remove the last assistant message
       const lastAssistantIdx = prev.reduceRight(
         (found, msg, idx) => (found === -1 && msg.role === 'assistant' ? idx : found),
         -1,
@@ -180,11 +293,26 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // ── Stop streaming ────────────────────────────────────────────
 
   const handleStop = useCallback(() => {
+    sendCancel()
+    // Keep accumulated text as a partial message
+    if (streamingText) {
+      const partialMsg: Message = {
+        id: Date.now(),
+        role: 'assistant',
+        content: streamingText + '\n\n*(остановлено)*',
+        files: [],
+        model: null,
+        duration_sec: null,
+        tokens_used: null,
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, partialMsg])
+    }
     setIsStreaming(false)
     setStreamingText('')
     setStatusText(null)
     setToolText(null)
-  }, [])
+  }, [sendCancel, streamingText])
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -196,30 +324,40 @@ export function ChatView({ conversationId }: ChatViewProps) {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto"
       >
-        <MessageList
-          messages={messages}
-          isLoading={isLoading}
-          onRegenerate={handleRegenerate}
-        />
+        <div className="max-w-3xl mx-auto w-full">
+          {/* Empty chat — show suggestions */}
+          {messages.length === 0 && !isLoading && !isStreaming && (
+            <div className="flex items-center justify-center py-16 px-4">
+              <SuggestionCards />
+            </div>
+          )}
 
-        {isStreaming && (
-          <StreamingMessage
-            text={streamingText}
-            statusText={statusText}
-            toolText={toolText}
-            onStop={handleStop}
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            onRegenerate={handleRegenerate}
           />
-        )}
 
-        {/* Bottom anchor for scroll */}
-        <div className="h-2" />
+          {isStreaming && (
+            <StreamingMessage
+              text={streamingText}
+              statusText={statusText}
+              toolText={toolText}
+              onStop={handleStop}
+            />
+          )}
+
+          <div className="h-2" />
+        </div>
       </div>
 
       {/* Scroll-to-bottom FAB */}
       {showScrollBottom && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-24 right-5 z-10 p-2 rounded-full bg-[#141414] border border-[#262626] text-[#a3a3a3] hover:text-[#f5f5f5] hover:border-[#525252] shadow-lg transition-all animate-fade-in"
+          aria-label="Прокрутить вниз"
+          title="Прокрутить вниз"
+          className="absolute bottom-24 right-5 z-10 p-2 rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] shadow-lg transition-all animate-fade-in"
         >
           <ChevronDown size={16} />
         </button>
@@ -227,10 +365,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {/* Error banner */}
       {error && !isStreaming && (
-        <div className="mx-4 mb-2 px-4 py-2.5 rounded-[8px] bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between gap-4">
+        <div className="mx-4 mb-2 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between gap-4">
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
+            aria-label="Закрыть ошибку"
             className="text-red-300 hover:text-red-100 text-xs underline shrink-0 transition-colors"
           >
             Закрыть
@@ -241,8 +380,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {/* Input */}
       <ChatInput
         onSend={handleSend}
-        disabled={isStreaming}
+        disabled={false}
         conversationId={conversationId}
+        placeholder={isStreaming ? 'Агент отвечает... (Enter отправит после)' : 'Ответить...'}
+        initialModel={conversationModel}
       />
     </div>
   )

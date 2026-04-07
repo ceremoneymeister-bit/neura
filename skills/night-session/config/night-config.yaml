@@ -17,11 +17,11 @@ orchestrator:
   # Max turns для claude -p
   max_turns: 50
   # Рабочая директория
-  workdir: "/root/Antigravity"
+  workdir: "/opt/neura-v2"
   # Путь к claude CLI
   claude_bin: "/usr/bin/claude"
   # Лог-директория
-  log_dir: "/root/Antigravity/logs/night"
+  log_dir: "/opt/neura-v2/logs/night"
   # Sandbox: изоляция задач в git worktree (safe mode)
   sandbox_mode: true
 

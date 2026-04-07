@@ -4,6 +4,14 @@ description: "Tailwind CSS v4 principles. CSS-first configuration, container que
 allowed-tools: Read, Write, Edit, Glob, Grep
 risk: unknown
 source: community
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "стилизация нового компонента"
+proactive_trigger_1_action: "предложить Tailwind паттерны"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Tailwind CSS Patterns (v4 - 2025)
@@ -295,3 +303,9 @@ const isInView = useInView(ref, { once: true, margin: "-50px" });
 ---
 
 > **Remember:** Tailwind v4 is CSS-first. Embrace CSS variables, container queries, and native features. The config file is now optional.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

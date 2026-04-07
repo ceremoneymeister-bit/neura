@@ -1,6 +1,14 @@
 ---
 name: excel-xlsx
 description: "Use when creating or editing Excel files (.xlsx) — таблицы, отчёты, экспорт данных, 'создай таблицу', 'сделай Excel', 'xlsx', формулы, аналитика"
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужна таблица/аналитика"
+proactive_trigger_1_action: "сгенерировать XLSX"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Excel / XLSX — работа с таблицами
@@ -193,3 +201,84 @@ df.to_excel('/tmp/crm_export.xlsx', index=False)
 | Локальный файл клиенту | .xlsx (этот скилл) |
 | Формулы + макросы | .xlsx |
 | Дашборд онлайн | Google Sheets |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 41 использований, success rate 100.0%, avg latency 54.0s
+- 2026-04-07: 40 использований, success rate 100.0%, avg latency 54.3s
+- 2026-04-07: 39 использований, success rate 100.0%, avg latency 55.2s
+- 2026-04-07: 38 использований, success rate 100.0%, avg latency 55.4s
+- 2026-04-07: 37 использований, success rate 100.0%, avg latency 55.1s
+- 2026-04-07: 36 использований, success rate 100.0%, avg latency 56.0s
+- 2026-04-07: 35 использований, success rate 100.0%, avg latency 57.1s
+- 2026-04-07: 34 использований, success rate 100.0%, avg latency 57.8s
+- 2026-04-07: 33 использований, success rate 100.0%, avg latency 59.0s
+- 2026-04-07: 32 использований, success rate 100.0%, avg latency 60.3s
+- 2026-04-07: 31 использований, success rate 100.0%, avg latency 57.8s
+- 2026-04-07: 30 использований, success rate 100.0%, avg latency 58.9s
+- 2026-04-07: 29 использований, success rate 100.0%, avg latency 59.8s
+- 2026-04-07: 28 использований, success rate 100.0%, avg latency 60.7s
+- 2026-04-07: 27 использований, success rate 100.0%, avg latency 61.6s
+- 2026-04-06: 26 использований, success rate 100.0%, avg latency 62.7s
+- 2026-04-06: 25 использований, success rate 100.0%, avg latency 63.8s
+- 2026-04-06: 24 использований, success rate 100.0%, avg latency 65.5s
+- 2026-04-06: 23 использований, success rate 100.0%, avg latency 67.1s
+- 2026-04-06: 22 использований, success rate 100.0%, avg latency 69.3s
+- 2026-04-06: 21 использований, success rate 100.0%, avg latency 71.5s
+- 2026-04-06: 20 использований, success rate 100.0%, avg latency 53.5s
+- 2026-04-06: 19 использований, success rate 100.0%, avg latency 51.5s
+- 2026-04-06: 18 использований, success rate 100.0%, avg latency 53.6s
+- 2026-04-06: 17 использований, success rate 100.0%, avg latency 53.8s
+- 2026-04-06: 16 использований, success rate 100.0%, avg latency 56.8s
+- 2026-04-06: 15 использований, success rate 100.0%, avg latency 58.9s
+- 2026-04-06: 14 использований, success rate 100.0%, avg latency 60.1s
+- 2026-04-06: 13 использований, success rate 100.0%, avg latency 61.5s
+- 2026-04-06: 12 использований, success rate 100.0%, avg latency 62.5s
+- 2026-04-06: 11 использований, success rate 100.0%, avg latency 57.2s
+- 2026-04-06: 10 использований, success rate 100.0%, avg latency 60.6s
+- 2026-04-06: 9 использований, success rate 100.0%, avg latency 44.5s
+- 2026-04-06: 8 использований, success rate 100.0%, avg latency 48.0s
+- 2026-04-06: 7 использований, success rate 100.0%, avg latency 52.4s
+- 2026-04-06: 6 использований, success rate 100.0%, avg latency 55.9s
+- 2026-04-06: 5 использований, success rate 100.0%, avg latency 62.4s

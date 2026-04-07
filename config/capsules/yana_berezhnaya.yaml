@@ -11,6 +11,7 @@ telegram:
     file_tools: true
     proactive: false
     btw_queue: true
+    onboarding: true
 claude:
   model: sonnet
   effort: standard
@@ -30,6 +31,7 @@ skills:
 - russian-typography
 - headline-lab
 - notion-pdf
+- pdf-reader
 - word-docx
 - excel-xlsx
 - ppt-generator
@@ -65,12 +67,21 @@ memory:
   diary_retention_days: 90
   max_long_term_entries: 100
   context_window:
-    today_diary: 10
-    recent_days: 3
-    recent_per_day: 10
-    learnings_chars: 3000
-    corrections_chars: 3000
-employees: []
+    today_diary: 20
+    recent_days: 30
+    recent_per_day: 5
+    learnings_chars: 5000
+    corrections_chars: 5000
+    diary_chars: 30000
+    diary_user_chars: 300
+    diary_bot_chars: 400
+internal_groups:
+  - -1002930580025   # БЕРЕЖНАЯ ЙОГА (топики: Йога, Дыхательные, МФР, Быстрая йога, Аюрведа)
+employees:
+- name: Дмитрий Ростовцев
+  role: producer
+  telegram_id: 1260958591
+  username: ceremoneymeister
 rate_limit:
   max_per_day: 100
   warn_at: 80

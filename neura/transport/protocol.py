@@ -42,6 +42,8 @@ class IncomingMessage:
     file_name: str | None = None
     reply_context: str = ""
     source: str = "telegram"
+    thread_id: int | None = None
+    chat_id: int | None = None
 
 
 @dataclass
@@ -60,6 +62,7 @@ class OutgoingMessage:
     files: list[MessageFile] = field(default_factory=list)
     learnings: list[str] = field(default_factory=list)
     corrections: list[str] = field(default_factory=list)
+    rules: list[str] = field(default_factory=list)
     telegraph_url: str | None = None
     is_long: bool = False
 
@@ -68,7 +71,8 @@ class OutgoingMessage:
 
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_MSG_LENGTH = 4000
-DEFAULT_ALLOWED_PREFIXES = ["/tmp/"]
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB — Telegram Bot API limit
+DEFAULT_ALLOWED_PREFIXES = ["/tmp/", "/opt/neura-v2/homes/"]
 
 
 class ResponseParser:
@@ -81,7 +85,7 @@ class ResponseParser:
         text = engine_text
 
         # 1. Extract markers
-        text, learnings, corrections = ResponseParser._parse_markers(text)
+        text, learnings, corrections, rules = ResponseParser._parse_markers(text)
 
         # 2. Extract files
         prefixes = allowed_prefixes or list(DEFAULT_ALLOWED_PREFIXES)
@@ -95,20 +99,23 @@ class ResponseParser:
             files=files,
             learnings=learnings,
             corrections=corrections,
+            rules=rules,
             is_long=is_long,
         )
 
     @staticmethod
-    def _parse_markers(text: str) -> tuple[str, list[str], list[str]]:
-        """Extract [LEARN:...] and [CORRECTION:...] markers from text."""
+    def _parse_markers(text: str) -> tuple[str, list[str], list[str], list[str]]:
+        """Extract [LEARN:...], [CORRECTION:...], and [RULE:...] markers."""
         learnings = re.findall(r'\[LEARN:(.*?)\]', text, re.DOTALL)
         corrections = re.findall(r'\[CORRECTION:(.*?)\]', text, re.DOTALL)
+        rules = re.findall(r'\[RULE:(.*?)\]', text, re.DOTALL)
 
         cleaned = re.sub(r'\[LEARN:.*?\]', '', text, flags=re.DOTALL)
         cleaned = re.sub(r'\[CORRECTION:.*?\]', '', cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r'\[RULE:.*?\]', '', cleaned, flags=re.DOTALL)
         cleaned = cleaned.strip()
 
-        return cleaned, [l.strip() for l in learnings], [c.strip() for c in corrections]
+        return cleaned, [l.strip() for l in learnings], [c.strip() for c in corrections], [r.strip() for r in rules]
 
     @staticmethod
     def _extract_files(text: str,
@@ -121,26 +128,38 @@ class ResponseParser:
         for fp in raw_files:
             fp = fp.strip()
             resolved = str(Path(fp).resolve())
-            if any(resolved.startswith(p) for p in allowed_prefixes):
-                ext = os.path.splitext(resolved)[1].lower()
-                filename = os.path.basename(resolved)
-                is_photo = ext in PHOTO_EXTENSIONS
-
-                if is_photo:
-                    caption = "\U0001f5bc Сгенерировано по вашему запросу"
-                elif ext == ".pdf":
-                    caption = f"\U0001f4c4 {ResponseParser._humanize_filename(filename)}"
-                elif ext in {".docx", ".doc"}:
-                    caption = f"\U0001f4dd {ResponseParser._humanize_filename(filename)}"
-                else:
-                    caption = filename
-
-                safe_files.append(MessageFile(
-                    path=resolved, filename=filename,
-                    is_photo=is_photo, caption=caption,
-                ))
-            else:
+            if not any(resolved.startswith(p) for p in allowed_prefixes):
                 logger.warning(f"Blocked file send (path traversal): {fp}")
+                continue
+            if not os.path.exists(resolved):
+                logger.warning(f"File not found, skipping: {resolved}")
+                continue
+            file_size = os.path.getsize(resolved)
+            if file_size > MAX_FILE_SIZE:
+                size_mb = file_size / (1024 * 1024)
+                logger.warning(f"File too large ({size_mb:.1f} MB > 50 MB): {resolved}")
+                continue
+            ext = os.path.splitext(resolved)[1].lower()
+            filename = os.path.basename(resolved)
+            is_photo = ext in PHOTO_EXTENSIONS
+
+            if is_photo:
+                caption = "\U0001f5bc Сгенерировано по вашему запросу"
+            elif ext == ".pdf":
+                caption = f"\U0001f4c4 {ResponseParser._humanize_filename(filename)}"
+            elif ext in {".docx", ".doc"}:
+                caption = f"\U0001f4dd {ResponseParser._humanize_filename(filename)}"
+            elif ext in {".xlsx", ".xls"}:
+                caption = f"\U0001f4ca {ResponseParser._humanize_filename(filename)}"
+            elif ext in {".pptx", ".ppt"}:
+                caption = f"\U0001f4ca {ResponseParser._humanize_filename(filename)}"
+            else:
+                caption = filename
+
+            safe_files.append(MessageFile(
+                path=resolved, filename=filename,
+                is_photo=is_photo, caption=caption,
+            ))
 
         return cleaned, safe_files
 
@@ -212,8 +231,8 @@ def _get_telegraph_token() -> str | None:
 
     try:
         acc_data = json.dumps({
-            "short_name": "Нейра",
-            "author_name": "Нейра",
+            "short_name": "Нэйра",
+            "author_name": "Нэйра",
         }).encode()
 
         req = urllib.request.Request(
@@ -248,7 +267,7 @@ def create_telegraph_page(title: str, content: str) -> str | None:
             "access_token": access_token,
             "title": title[:256],
             "content": nodes,
-            "author_name": "Нейра",
+            "author_name": "Нэйра",
         }).encode()
 
         req = urllib.request.Request(
@@ -287,6 +306,57 @@ async def transcribe_voice(file_path: str) -> str:
     return await _transcribe_whisper(file_path)
 
 
+def _guess_audio_content_type(file_path: str) -> str:
+    """Guess audio MIME type from file extension."""
+    ext = Path(file_path).suffix.lower()
+    types = {
+        ".ogg": "audio/ogg", ".oga": "audio/ogg",
+        ".mp3": "audio/mpeg", ".mp4": "audio/mp4",
+        ".m4a": "audio/mp4", ".wav": "audio/wav",
+        ".webm": "audio/webm", ".flac": "audio/flac",
+        ".aac": "audio/aac", ".opus": "audio/ogg",
+    }
+    return types.get(ext, "audio/ogg")
+
+
+async def download_via_mtproto(bot_token: str, chat_id: int, message_id: int, dest_path: str) -> bool:
+    """Download file via Telethon MTProto userbot — no 20MB limit.
+
+    Uses the parser userbot session (already authorized) to download files
+    that exceed the 20MB Bot API limit.
+    """
+    try:
+        from telethon import TelegramClient
+
+        api_id = int(os.environ.get("TELETHON_API_ID", "33869550"))
+        api_hash = os.environ.get("TELETHON_API_HASH", "")
+        if not api_hash:
+            logger.warning("TELETHON_API_HASH not set, MTProto download unavailable")
+            return False
+
+        # Use parser userbot session (already authorized, no login needed)
+        session_path = os.environ.get(
+            "TELETHON_SESSION_PATH",
+            "/root/Antigravity/.secrets/telegram_userbot_parser",
+        )
+        client = TelegramClient(session_path, api_id, api_hash)
+        try:
+            await client.connect()
+            if not await client.is_user_authorized():
+                logger.error("MTProto userbot session not authorized")
+                return False
+            msg = await client.get_messages(chat_id, ids=message_id)
+            if msg and msg.media:
+                await client.download_media(msg, file=dest_path)
+                return True
+            return False
+        finally:
+            await client.disconnect()
+    except Exception as e:
+        logger.error(f"MTProto download failed: {e}")
+        return False
+
+
 async def _transcribe_deepgram(file_path: str) -> str:
     """Transcribe using Deepgram nova-2 API."""
     def _do_request():
@@ -295,15 +365,16 @@ async def _transcribe_deepgram(file_path: str) -> str:
 
         key = os.environ["DEEPGRAM_API_KEY"]
         url = "https://api.deepgram.com/v1/listen?model=nova-2&language=ru&smart_format=true"
+        content_type = _guess_audio_content_type(file_path)
 
         req = urllib.request.Request(
             url, data=audio_data,
             headers={
                 "Authorization": f"Token {key}",
-                "Content-Type": "audio/ogg",
+                "Content-Type": content_type,
             },
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=180) as resp:  # 3 min for long voice (10+ min audio)
             result = json.loads(resp.read())
 
         transcript = (

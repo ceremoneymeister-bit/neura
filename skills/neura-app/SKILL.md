@@ -7,6 +7,17 @@ tags: [neura-app, librechat, bridge, docker, web-interface, admin-panel]
 usage_count: 3
 maturity: tested
 last_used: 2026-03-31
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "изменения в Docker/bridge/neura-app"
+proactive_trigger_1_action: "предложить аудит и рестарт"
+proactive_trigger_2_type: threshold
+proactive_trigger_2_condition: "bridge errors > 3 за час"
+proactive_trigger_2_action: "предложить диагностику"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Neura App — Skill
@@ -499,3 +510,30 @@ MongoDB хранит ответы с `<neura-thinking>` тегами. `get_chat_
 - [ ] MCP tools через bridge
 - [ ] Plan mode UI
 - [ ] Git в capsule_tools
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+### 2026-03-23 — создание скилла, UI v1.2
+- Включено Избранное (bookmarks: true), скилл создан (инфра, конфиг, bridge, roadmap)
+- Зарегистрирован в таблице маршрутизации CLAUDE.md
+
+### 2026-03-28 — масштабное обновление v2.2 (14 фич)
+- Client-side file injection (FileReader, 40+ расширений, обход сломанного extractFileContext)
+- PDF extraction (pdf.js), Artifact Viewer (side panel), wildcard file types
+- health-check.py (23 проверки), cron 06:30 UTC
+- Антипаттерн: LibreChat extractFileContext() проверяет source==='text', загруженные source='local' → контент отбрасывается
+- Урок: при дебаге стороннего софта — читать исходники, а не полагаться на документацию
+
+### 2026-03-31 — критический debugging (UFW + agents.use + ban + thinking)
+- ROOT CAUSE: UFW блокирует Docker→Bridge (порт 8090). Правило: `ufw allow from 172.16.0.0/12 to any port 8090`
+- agents.use: false → 403 Forbidden. Фикс: agents.use: true + disableBuilder: true
+- Ban хранится в MongoDB (переживает рестарт!). Очистка: `db.logs.deleteMany({key: /^(ban|BAN)/})`
+- Thinking blocks v2: live streaming, пульс, авто-скролл, сворачивание
+- Антипаттерн: innerHTML во время стриминга = потеря букв. НЕ трогать DOM пока .result-streaming активен
+- Антипаттерн: thinking теги → мерцание (тег разбивается по чанкам). Отправлять ОДНИМ SSE-чанком
+- Урок: SESSION_EXPIRY 15мин для LibreChat → рестарт = 401 у всех. Минимум 24ч
+- Урок: при 401 — проверить: браузерный кеш, ban в MongoDB, SESSION_EXPIRY, UFW

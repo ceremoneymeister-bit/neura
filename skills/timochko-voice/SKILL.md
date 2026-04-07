@@ -9,6 +9,14 @@ category: content
 tags: [brand-voice, telegram, copywriting, blogger-style, engagement, storytelling]
 risk: safe
 source: internal
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "пост в стиле Тимочко"
+proactive_trigger_1_action: "применить блогерский стиль"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Timochko Voice — Universal Blogger Voice Profile
@@ -693,3 +701,9 @@ https://youtu.be/xxxxx
 ФОРМАТЫ: Story > Framework > Challenge > Hot Take > Promo > Engagement
 ТАБУ: корпоративный язык, хеджирование, длинные предложения, эмодзи-спам
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

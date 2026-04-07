@@ -3,6 +3,14 @@ name: social-content
 description: "When the user wants help creating, scheduling, or optimizing social media content for LinkedIn, Twitter/X, Instagram, TikTok, Facebook, or other platforms. Also use when the user mentions 'LinkedIn..."
 risk: unknown
 source: community
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "вторник/четверг"
+proactive_trigger_1_action: "предложить посты для соцсетей"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Social Content
@@ -909,3 +917,114 @@ If you need more context:
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 80 использований, success rate 100.0%, avg latency 47.3s
+- 2026-04-07: 68 использований, success rate 100.0%, avg latency 47.8s
+- 2026-04-07: 65 использований, success rate 100.0%, avg latency 47.8s
+- 2026-04-07: 59 использований, success rate 100.0%, avg latency 48.3s
+- 2026-04-07: 56 использований, success rate 100.0%, avg latency 48.4s
+- 2026-04-07: 55 использований, success rate 100.0%, avg latency 48.7s
+- 2026-04-07: 54 использований, success rate 100.0%, avg latency 47.5s
+- 2026-04-07: 53 использований, success rate 100.0%, avg latency 48.0s
+- 2026-04-07: 52 использований, success rate 100.0%, avg latency 47.9s
+- 2026-04-07: 51 использований, success rate 100.0%, avg latency 48.2s
+- 2026-04-07: 50 использований, success rate 100.0%, avg latency 48.8s
+- 2026-04-06: 45 использований, success rate 100.0%, avg latency 48.4s
+- 2026-04-06: 44 использований, success rate 100.0%, avg latency 49.0s
+- 2026-04-06: 43 использований, success rate 100.0%, avg latency 49.8s
+- 2026-04-06: 42 использований, success rate 100.0%, avg latency 50.7s
+- 2026-04-06: 41 использований, success rate 100.0%, avg latency 51.5s
+- 2026-04-06: 40 использований, success rate 100.0%, avg latency 52.3s
+- 2026-04-06: 39 использований, success rate 100.0%, avg latency 52.6s
+- 2026-04-06: 38 использований, success rate 100.0%, avg latency 53.1s
+- 2026-04-06: 37 использований, success rate 100.0%, avg latency 48.6s
+- 2026-04-06: 36 использований, success rate 100.0%, avg latency 49.4s
+- 2026-04-06: 35 использований, success rate 100.0%, avg latency 50.3s
+- 2026-04-06: 34 использований, success rate 100.0%, avg latency 50.6s
+- 2026-04-06: 33 использований, success rate 100.0%, avg latency 51.4s
+- 2026-04-06: 32 использований, success rate 100.0%, avg latency 52.4s
+- 2026-04-06: 31 использований, success rate 100.0%, avg latency 53.6s
+- 2026-04-06: 30 использований, success rate 100.0%, avg latency 54.7s
+- 2026-04-06: 29 использований, success rate 100.0%, avg latency 55.4s
+- 2026-04-06: 28 использований, success rate 100.0%, avg latency 56.8s
+- 2026-04-06: 27 использований, success rate 100.0%, avg latency 58.1s
+- 2026-04-06: 26 использований, success rate 100.0%, avg latency 59.5s
+- 2026-04-05: 25 использований, success rate 100.0%, avg latency 61.3s
+- 2026-04-05: 24 использований, success rate 100.0%, avg latency 62.7s
+- 2026-04-05: 23 использований, success rate 100.0%, avg latency 64.2s
+- 2026-04-05: 22 использований, success rate 100.0%, avg latency 65.9s
+- 2026-04-05: 21 использований, success rate 100.0%, avg latency 68.3s
+- 2026-04-05: 20 использований, success rate 100.0%, avg latency 58.6s
+- 2026-04-05: 19 использований, success rate 100.0%, avg latency 47.9s
+- 2026-04-05: 18 использований, success rate 100.0%, avg latency 44.8s
+- 2026-04-05: 17 использований, success rate 100.0%, avg latency 45.8s
+- 2026-04-05: 16 использований, success rate 100.0%, avg latency 47.1s
+- 2026-04-05: 15 использований, success rate 100.0%, avg latency 48.9s
+- 2026-04-05: 14 использований, success rate 100.0%, avg latency 50.8s
+- 2026-04-05: 13 использований, success rate 100.0%, avg latency 46.8s
+- 2026-04-05: 12 использований, success rate 100.0%, avg latency 48.5s
+- 2026-04-04: 11 использований, success rate 100.0%, avg latency 51.1s
+- 2026-04-04: 10 использований, success rate 100.0%, avg latency 48.3s
+- 2026-04-04: 9 использований, success rate 100.0%, avg latency 36.8s
+- 2026-04-03: 8 использований, success rate 100.0%, avg latency 37.6s
+- 2026-04-03: 7 использований, success rate 100.0%, avg latency 39.7s
+- 2026-04-03: 6 использований, success rate 100.0%, avg latency 44.2s
+- 2026-04-03: 5 использований, success rate 100.0%, avg latency 39.7s

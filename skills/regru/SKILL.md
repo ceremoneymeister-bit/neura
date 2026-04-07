@@ -1,12 +1,23 @@
 ---
 name: regru
-description: "Управление хостингом REG.ru — деплой через FTP, DNS, SSL, домены"
+description: Управление хостингом REG.ru — деплой через FTP, DNS, SSL, домены
 version: 1.0.0
 category: infrastructure
 tags: [regru, ftp, deploy, dns, ssl, hosting]
 usage_count: 0
 maturity: seed
 last_used: null
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "после деплоя сайта"
+proactive_trigger_1_action: "проверить SSL, DNS, .htaccess"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "новый домен/поддомен"
+proactive_trigger_2_action: "настроить DNS и SSL"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Скилл: regru — Управление хостингом REG.ru
@@ -154,3 +165,9 @@ last_used: null
 - REG.ru **НЕ** имеет API для файлового менеджера — только FTP для файлов
 - REG.API 2.0 — только для доменов, DNS, заказов услуг
 - Панель управления защищена Yandex SmartCaptcha — headless-браузер не пройдёт
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -9,6 +9,14 @@ category: deployment
 tags: [client, deployment, agent, telegram, onboarding]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "агент готов к сдаче"
+proactive_trigger_1_action: "запустить workflow деплоя и онбординга"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # client-deployment
@@ -188,3 +196,9 @@ tmux new-session -d -s {name} -c {workdir} \
 - Досье сотрудников = killer feature для персонализации
 - Демо-кнопки в /start — лучший способ показать возможности
 - Стабы интеграций → реальные API делать ПОСЛЕ сдачи MVP
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

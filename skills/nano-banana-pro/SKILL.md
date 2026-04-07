@@ -1,6 +1,14 @@
 ---
 name: nano-banana-pro
 description: "Use when generating or editing images via AI — 'создай картинку', 'сгенерируй изображение', 'отредактируй фото', 'нарисуй', image generation, AI art"
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужна картинка/иллюстрация"
+proactive_trigger_1_action: "сгенерировать через Grsai API"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Nano Banana Pro — AI-генерация изображений
@@ -126,3 +134,32 @@ python3 /root/Antigravity/scripts/grsai-image.py generate \
 - НЕ использовать Gemini для простой генерации → Grsai дешевле
 - НЕ забывать `[FILE:]` маркер → иначе пользователь не получит картинку
 - Файлы на Grsai сервере живут 2 часа → скрипт скачивает автоматически
+- **Консистентность объекта в серии:** при генерации одного предмета в разных сценах — использовать `--seed` (одинаковый) + максимально детальное описание предмета (форма, материал, цвет, текстура, ярусы). Без seed и деталей объект будет разным на каждом кадре
+- **Реальные товары:** описывать по реальному фото, а не абстрактно. "green wax Christmas tree candle with 4 tiers of overlapping leaf-shaped petals" >> "christmas tree candle"
+- **gpt-image-1.5 + --ref:** таймаутит (120с, 1% прогресса). Не использовать для задач с reference-изображениями
+- **Pixel-perfect inpainting (объект из фото + новый фон):** Grsai НЕ поддерживает edit/inpaint. Нужен Gemini edit или OpenAI DALL-E edit. Gemini заблокирован в Латвии (EEA) — требуется прокси (CF Worker / Atlas DNS)
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 13 использований, success rate 100.0%, avg latency 20.5s
+- 2026-04-07: 12 использований, success rate 100.0%, avg latency 20.0s
+- 2026-04-07: 11 использований, success rate 100.0%, avg latency 18.9s
+- 2026-04-07: 10 использований, success rate 100.0%, avg latency 17.6s
+- 2026-04-07: 9 использований, success rate 100.0%, avg latency 17.6s
+- 2026-04-07: 8 использований, success rate 100.0%, avg latency 17.7s
+- 2026-04-07: 7 использований, success rate 100.0%, avg latency 18.2s
+- 2026-04-07: 6 использований, success rate 100.0%, avg latency 18.6s
+- 2026-04-07: 5 использований, success rate 100.0%, avg latency 19.7s

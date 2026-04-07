@@ -9,6 +9,17 @@ category: infrastructure
 tags: [errors, debugging, monitoring, proactive, self-healing]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "ежедневно 21:00"
+proactive_trigger_1_action: "агрегировать ошибки из journalctl + Docker + cron"
+proactive_trigger_2_type: threshold
+proactive_trigger_2_condition: "critical errors > 0"
+proactive_trigger_2_action: "немедленный алерт"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Error Tracker — сборщик и агрегатор ошибок
@@ -152,3 +163,9 @@ python3 collector.py patterns --min-count 3
 | `collector.py` | Движок сбора и агрегации (CLI) |
 | `data/errors.jsonl` | Все собранные ошибки (append-only) |
 | `data/error_patterns.json` | Повторяющиеся паттерны |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

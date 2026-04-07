@@ -8,6 +8,14 @@ category: content
 tags: [brand-voice, style-clone, telegram, content, copywriting]
 risk: safe
 source: custom
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый клиент"
+proactive_trigger_1_action: "извлечь brand voice из канала/текстов"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Brand Voice Clone
@@ -217,3 +225,9 @@ prompt = f"""
 ### Отправка результата клиенту
 
 После анализа — отправить в HQ-группу клиента через бота (не через userbot). Разбить на 5-6 сообщений: шапка + сравнение + что работает + слабые места + идеи + контент-план.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

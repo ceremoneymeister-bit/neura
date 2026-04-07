@@ -1,6 +1,14 @@
 ---
 name: russian-typography
 description: Rules for proper Russian typography and typesetting, focusing on non-breaking spaces
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "текст на русском для лендинга/бота"
+proactive_trigger_1_action: "проверить неразрывные пробелы и висящие предлоги"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Russian Typography Guidelines
@@ -28,3 +36,9 @@ You must ALWAYS bind short words (prepositions, conjunctions, particles) to the 
 - Applies to all UI elements (React components, HTML, etc.).
 - When outputting raw Markdown that will be rendered, use standard non-breaking spaces or tell the user you are applying typographic rules.
 - Note: Do NOT add `&nbsp;` to system-level code or keys, only string literals meant for display.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

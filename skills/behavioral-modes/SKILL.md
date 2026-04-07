@@ -4,6 +4,14 @@ description: "AI operational modes (brainstorm, implement, debug, review, teach,
 allowed-tools: Read, Glob, Grep
 risk: unknown
 source: community
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "переключение контекста работы"
+proactive_trigger_1_action: "сменить режим (brainstorm/implement/debug)"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Behavioral Modes - Adaptive AI Operating Modes
@@ -245,3 +253,9 @@ Users can explicitly request a mode:
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

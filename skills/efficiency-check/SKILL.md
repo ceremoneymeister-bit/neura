@@ -2,6 +2,14 @@
 name: efficiency-check
 description: "Автоматическая проверка эффективности подхода перед выполнением задачи"
 trigger: always
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "пятница"
+proactive_trigger_1_action: "проверка эффективности процессов"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Efficiency Check — проверка эффективности
@@ -76,3 +84,9 @@ Maintenance-скрипты и cron-задачи должны быть тихим
 Начинай с минимального изменения. Не оптимизируй всё сразу.
 - Одно изменение → проверка → следующее
 - Откатывай если improvement < 10%
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

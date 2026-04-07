@@ -1,6 +1,14 @@
 ---
 name: ui-ux-pro-max
 description: UI/UX design intelligence. 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks.
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "дизайн-система или палитра"
+proactive_trigger_1_action: "предложить стили и шрифты"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 # ui-ux-pro-max
 
@@ -360,3 +368,9 @@ stars = "⭐" * max(1, round(q * 5))  # ⭐⭐⭐⭐⭐
 - [ ] ✖️ Закрыть удаляет сообщение меню
 - [ ] Stats panel: progress bar + quality stars + back/refresh
 - [ ] Plan mode: бейдж в кнопках + footer в тексте ответа
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -14,6 +14,14 @@ usage_count: 0
 maturity: seed
 last_used: null
 created_from: "Конструктор прогревов 2.0 (Тимочко) + Таблица распаковки + 17 шагов запуска + Пыриков (11 категорий)"
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "запуск через 14+ дней"
+proactive_trigger_1_action: "начать прогрев аудитории"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # warmup-constructor
@@ -297,3 +305,9 @@ created_from: "Конструктор прогревов 2.0 (Тимочко) + 
 - **Пыриков:** 11 категорий контента, система запусков, формула 70/20/10
 - **Ben Hunt:** Лестница узнавания (5 ступеней)
 - **Knowledge base:** `projects/Producing/knowledge_base/transcriptions/Тимочко/timochko_pdfs_extracted.md`
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

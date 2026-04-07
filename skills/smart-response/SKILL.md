@@ -7,6 +7,14 @@ tags: [telegraph, long-response, telegram, chunking, fallback]
 usage_count: 0
 maturity: seed
 last_used: null
+proactive_enabled: true
+proactive_trigger_1_type: threshold
+proactive_trigger_1_condition: "ответ > 4000 символов"
+proactive_trigger_1_action: "автоматически переключить на Telegraph"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Smart Response — Telegraph для длинных ответов
@@ -205,3 +213,9 @@ async def create_telegraph_page(title: str, content: str) -> str:
 6. [ ] Проверить `[FILE:/path]` маркеры — извлечь ДО отправки в Telegraph
 7. [ ] `reply_markup` только на последнем сообщении (при чанках)
 8. [ ] Для Docker: token в volume, не в image layer
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

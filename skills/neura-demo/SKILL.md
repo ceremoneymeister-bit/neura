@@ -7,6 +7,17 @@ created: 2026-03-17
 category: sales
 tags: [demo, presentation, neura, sales, wow]
 risk: safe
+proactive_enabled: true
+proactive_trigger_1_type: silence
+proactive_trigger_1_condition: "14 дней без демо потенциальным клиентам"
+proactive_trigger_1_action: "предложить провести демо"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "новый лид"
+proactive_trigger_2_action: "подготовить wow-презентацию"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Нейра — Презентационный режим
@@ -244,3 +255,9 @@ risk: safe
 ---
 
 *Источники: НЕЧ20 (продающее видео, автоворонки, декомпозиция целей), ConversionArt*
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -3,6 +3,14 @@ name: client-integration
 version: 1.0
 description: Подключение внешних сервисов клиенту (Telegram userbot, iCloud, Deepgram, и др.)
 triggers: ["подключить Telegram", "userbot", "авторизация Telethon", "iCloud календарь", "Deepgram", "подключить сервис клиенту", "интеграция клиента"]
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "капсула создана"
+proactive_trigger_1_action: "предложить подключить userbot, iCloud, Deepgram"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Client Integration — подключение сервисов клиенту
@@ -158,3 +166,9 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 - [ ] iCloud календарь подключён (если нужен)
 - [ ] Deepgram настроен (если нужен)
 - [ ] Загрузка файлов работает (если нужен)
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

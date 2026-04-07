@@ -9,6 +9,14 @@ category: integration
 tags: [vk, vkontakte, social-media, community, posting, messages]
 risk: low
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый пост для кросс-постинга"
+proactive_trigger_1_action: "опубликовать в VK"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # vk-community
@@ -138,3 +146,46 @@ python3 scripts/vk-cli.py wall-delete TOKEN -GROUP_ID POST_ID
 
 - `references/api.md` — справочник методов VK API с примерами
 - CLI скрипт: `scripts/vk-cli.py`
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 22 использований, success rate 100.0%, avg latency 34.3s
+- 2026-04-07: 21 использований, success rate 100.0%, avg latency 35.2s
+- 2026-04-07: 20 использований, success rate 100.0%, avg latency 36.2s
+- 2026-04-07: 19 использований, success rate 100.0%, avg latency 35.0s
+- 2026-04-06: 18 использований, success rate 100.0%, avg latency 36.2s
+- 2026-04-06: 17 использований, success rate 100.0%, avg latency 37.0s
+- 2026-04-06: 16 использований, success rate 100.0%, avg latency 36.2s
+- 2026-04-06: 15 использований, success rate 100.0%, avg latency 37.4s
+- 2026-04-06: 14 использований, success rate 100.0%, avg latency 34.9s
+- 2026-04-05: 13 использований, success rate 100.0%, avg latency 30.4s
+- 2026-04-05: 12 использований, success rate 100.0%, avg latency 31.3s
+- 2026-04-05: 11 использований, success rate 100.0%, avg latency 32.7s
+- 2026-04-05: 10 использований, success rate 100.0%, avg latency 34.6s
+- 2026-04-05: 9 использований, success rate 100.0%, avg latency 37.0s
+- 2026-04-05: 8 использований, success rate 100.0%, avg latency 28.1s
+- 2026-04-05: 7 использований, success rate 100.0%, avg latency 29.4s
+- 2026-04-04: 6 использований, success rate 100.0%, avg latency 27.6s
+- 2026-04-04: 5 использований, success rate 100.0%, avg latency 26.2s

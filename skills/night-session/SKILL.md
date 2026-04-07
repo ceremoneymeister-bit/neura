@@ -9,6 +9,14 @@ category: meta
 tags: [night, autonomous, orchestrator, parallel, validation, resilience, intelligence]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "NIGHT_TASKS.md обновлён"
+proactive_trigger_1_action: "запустить ночной оркестратор"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # night-session — Night Orchestrator v3
@@ -182,6 +190,75 @@ journalctl -u night-orchestrator.service -f
 - Бэкап критических данных
 - Сканирование новых угроз/возможностей
 
+## Multi-Agent Delegation Protocol (MADP)
+
+> Урок 01.04.2026: при раздаче задач 4+ ночным агентам без этого протокола —
+> конфликты файлов, поломка сервисов, зависшие npm, неработающие зависимости.
+
+### Когда использовать
+- 3+ агентов работают параллельно над ОДНИМ проектом
+- Задачи имеют зависимости (backend → frontend → компоненты)
+- Агенты создают файлы в общей директории
+
+### Чеклист подготовки задач (7 пунктов)
+
+| # | Проверка | Что делать |
+|---|----------|-----------|
+| 1 | **Service Protection** | Явно запретить restart/stop/kill ВСЕХ работающих сервисов. Список: `systemctl list-units --state=active \| grep neura` |
+| 2 | **Dependency Chain** | Нарисовать граф зависимостей: Agent 1 → 2 → 3. Каждый агент получает fallback: "если файл X не создан — создай заглушку" |
+| 3 | **File Isolation** | Каждый агент = своя папка. Перечислить явно: "Agent 2 пишет ТОЛЬКО в `web/src/layout/`, НЕ трогает `web/src/components/chat/`" |
+| 4 | **Non-Interactive Commands** | Все CLI команды должны быть неинтерактивными: `echo y \| npm create vite`, `pip install --quiet`, `yes \| ...` |
+| 5 | **Standalone Modules** | Новый код = standalone модуль с `if __name__ == "__main__"`. Интеграцию в основной процесс делать ВРУЧНУЮ утром |
+| 6 | **Interval Calculation** | Минимум 30 мин между зависимыми агентами. Независимые можно параллельно |
+| 7 | **Auditor Agent** | Последний агент ВСЕГДА аудитор: проверяет все результаты, фиксит баги, делает `build` и `pytest` |
+
+### Формула интервала между агентами
+
+```
+Independent agents (no deps):     5 min apart
+Dependent agents (reads output):  30 min apart
+Auditor (checks all):             max(90 min after last builder, 60 min)
+```
+
+### Шаблон промпта для night-agent.sh
+
+```bash
+PROMPT="Ты — ночной автономный агент. Дмитрий спит.
+
+ЗАДАЧА: [читай NIGHT_TASKS.md → задача N]
+
+КРИТИЧЕСКИЕ ПРАВИЛА:
+- ⛔ НЕ перезапускать [список сервисов]
+- ⛔ НЕ делать git push
+- ⛔ НЕ отправлять клиентам
+- ✅ Используй WebSearch для best practices
+- ✅ Если файл от предыдущего агента не создан — создай заглушку
+- ✅ Будь ПРОАКТИВНЫМ
+- ✅ Отправь отчёт в HQ topic 962"
+```
+
+### Anti-Patterns делегации
+
+| ❌ Ошибка | ✅ Правильно |
+|-----------|-------------|
+| "Интегрируй в app.py" (модифицирует running code) | "Создай standalone web.py, интеграцию утром вручную" |
+| `npm create vite` (интерактивно) | `echo y \| npm create vite@latest -- --template react-ts` |
+| Agent 3 зависит от Agent 2, но стартует через 5 мин | Интервал 30 мин + fallback инструкция |
+| "Все тесты должны пройти" (без конкретики) | "pytest tests/test_web.py -xvs && pytest tests/ -x" |
+| 4 агента, нет аудитора | Всегда 5-й агент = аудитор (через 90 мин) |
+
+### Прогнозирование результатов
+
+Перед запуском — составь таблицу прогнозов для каждого агента:
+
+| Агент | Ожидаемые файлы | LOC | Уверенность | Главный риск |
+|-------|----------------|-----|-------------|-------------|
+| 1 | web.py, auth.py, 002.sql | ~800 | 90% | pip install |
+| 2 | web/src/ (15+ файлов) | ~600 | 85% | npm interactive |
+| ... | ... | ... | ... | ... |
+
+Если уверенность < 70% — переписать спеку или добавить fallback.
+
 ## PDF Themes
 
 Ночные отчёты генерируются через `md2pdf.py`. Доступные темы:
@@ -294,3 +371,9 @@ docker-compose.yml     → env конфиг
 - v3: 28.03 — ручные задачи не отмечались [✓] автоматически → оркестратор крутил одни и те же задачи. Добавлен `_mark_task_done()` в `_handle_result()`
 - v3: 28.03 — шаблоны proactive_message/skill_improvement/content были daily → перерасход токенов. Пересмотрены на weekly/2x_week
 - v3: 28.03 — NIGHT_TASKS.md нужно чистить после выполнения всех задач, иначе парсер тратит время на 300+ строк заметок
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

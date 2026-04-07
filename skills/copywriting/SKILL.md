@@ -6,6 +6,17 @@ source: community
 usage_count: 1
 last_used: 2026-04-01
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "понедельник 10:00"
+proactive_trigger_1_action: "предложить контент-план на неделю"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "создание лендинга"
+proactive_trigger_2_action: "написать конверсионные тексты"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Copywriting
@@ -327,3 +338,70 @@ When writing commercial proposals / pricing documents:
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 36 использований, success rate 100.0%, avg latency 66.8s
+- 2026-04-07: 35 использований, success rate 100.0%, avg latency 68.1s
+- 2026-04-06: 34 использований, success rate 100.0%, avg latency 68.5s
+- 2026-04-06: 33 использований, success rate 100.0%, avg latency 69.6s
+- 2026-04-06: 32 использований, success rate 100.0%, avg latency 71.1s
+- 2026-04-06: 31 использований, success rate 100.0%, avg latency 72.7s
+- 2026-04-06: 29 использований, success rate 100.0%, avg latency 74.7s
+- 2026-04-06: 28 использований, success rate 100.0%, avg latency 75.8s
+- 2026-04-06: 27 использований, success rate 100.0%, avg latency 78.2s
+- 2026-04-06: 26 использований, success rate 100.0%, avg latency 80.0s
+- 2026-04-06: 25 использований, success rate 100.0%, avg latency 81.1s
+- 2026-04-06: 23 использований, success rate 100.0%, avg latency 83.2s
+- 2026-04-06: 22 использований, success rate 100.0%, avg latency 85.9s
+- 2026-04-06: 21 использований, success rate 100.0%, avg latency 89.1s
+- 2026-04-06: 20 использований, success rate 100.0%, avg latency 88.9s
+- 2026-04-06: 19 использований, success rate 100.0%, avg latency 92.6s
+- 2026-04-05: 18 использований, success rate 100.0%, avg latency 96.9s
+- 2026-04-05: 17 использований, success rate 100.0%, avg latency 98.3s
+- 2026-04-05: 16 использований, success rate 100.0%, avg latency 100.7s
+- 2026-04-05: 15 использований, success rate 100.0%, avg latency 105.7s
+- 2026-04-05: 14 использований, success rate 100.0%, avg latency 111.8s
+- 2026-04-05: 13 использований, success rate 100.0%, avg latency 113.2s
+- 2026-04-05: 12 использований, success rate 100.0%, avg latency 118.9s
+- 2026-04-05: 11 использований, success rate 100.0%, avg latency 119.0s
+- 2026-04-05: 10 использований, success rate 100.0%, avg latency 125.9s
+- 2026-04-05: 9 использований, success rate 100.0%, avg latency 115.1s
+- 2026-04-05: 8 использований, success rate 100.0%, avg latency 120.1s
+- 2026-04-05: 7 использований, success rate 100.0%, avg latency 116.3s
+- 2026-04-05: 6 использований, success rate 100.0%, avg latency 132.2s
+- 2026-04-04: 5 использований, success rate 100.0%, avg latency 153.2s

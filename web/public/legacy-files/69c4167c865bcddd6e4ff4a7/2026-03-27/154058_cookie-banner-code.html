@@ -1,0 +1,528 @@
+<!-- ========================================
+     COOKIE BANNER - Готовый код для вставки на сайт
+     ======================================== -->
+
+<!-- Вставить эот HTML в <body> сайта (перед закрывающим </body>) -->
+
+<div id="cookieBanner" class="cookie-banner">
+    <div class="cookie-banner-content">
+        <div class="cookie-banner-text">
+            <h3>🍪 Мы используем файлы cookie</h3>
+            <p>Мы используем файлы cookie для улучшения работы сайта и анализа посещаемости. Некоторые файлы необходимы для работы сайта, другие помогают нам улучшить ваш опыт.</p>
+            <p style="font-size: 13px; margin-top: 8px;">
+                <a href="/politika-pd" target="_blank">Политика обработки персональных данных</a> |
+                <a href="/cookie" target="_blank">Cookie-политика</a>
+            </p>
+        </div>
+
+        <div class="cookie-banner-buttons">
+            <button id="cookieAcceptAll" class="btn btn-primary">Принять все</button>
+            <button id="cookieSettings" class="btn btn-secondary">Настроить</button>
+            <button id="cookieReject" class="btn btn-tertiary">Только необходимые</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div id="cookieSettingsModal" class="cookie-modal" style="display: none;">
+    <div class="cookie-modal-content">
+        <div class="cookie-modal-header">
+            <h2>Настройки Cookie</h2>
+            <button id="cookieModalClose" class="cookie-modal-close">&times;</button>
+        </div>
+
+        <div class="cookie-modal-body">
+            <div class="cookie-category-item">
+                <div class="cookie-category-header">
+                    <strong>✅ Необходимые (всегда включены)</strong>
+                </div>
+                <p class="cookie-category-description">
+                    Обеспечивают базовую работу сайта: навигацию, заполнение форм, безопасность.
+                    Отключить невозможно.
+                </p>
+            </div>
+
+            <div class="cookie-category-item">
+                <div class="cookie-category-header">
+                    <input type="checkbox" id="cookieAnalytical" class="cookie-checkbox" />
+                    <label for="cookieAnalytical">Аналитические</label>
+                </div>
+                <p class="cookie-category-description">
+                    Помогают нам понять, как пользователи используют сайт (Яндекс.Метрика).
+                    Данные анонимизированы.
+                </p>
+            </div>
+
+            <div class="cookie-category-item">
+                <div class="cookie-category-header">
+                    <input type="checkbox" id="cookieMarketing" class="cookie-checkbox" />
+                    <label for="cookieMarketing">Маркетинговые</label>
+                </div>
+                <p class="cookie-category-description">
+                    Используются для показа рекламы и ретаргетинга.
+                    Позволяют персонализировать контент и рекламу.
+                </p>
+            </div>
+        </div>
+
+        <div class="cookie-modal-footer">
+            <button id="cookieSaveSettings" class="btn btn-primary">Сохранить настройки</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================
+     CSS для Cookie-баннера и модальных окон
+     ======================================== -->
+
+<style>
+/* Cookie Banner */
+.cookie-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.cookie-banner-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 30px;
+}
+
+.cookie-banner-text {
+    flex: 1;
+}
+
+.cookie-banner-text h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #1a5490;
+}
+
+.cookie-banner-text p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.cookie-banner-text a {
+    color: #1a5490;
+    text-decoration: none;
+}
+
+.cookie-banner-text a:hover {
+    text-decoration: underline;
+}
+
+.cookie-banner-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #1a5490;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0f3d6e;
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+    background: #e5e5e5;
+}
+
+.btn-tertiary {
+    background: transparent;
+    color: #1a5490;
+    border: 1px solid #1a5490;
+}
+
+.btn-tertiary:hover {
+    background: #f0f5ff;
+}
+
+/* Cookie Modal */
+.cookie-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.cookie-modal-content {
+    background: white;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.cookie-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.cookie-modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #1a5490;
+}
+
+.cookie-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cookie-modal-close:hover {
+    color: #333;
+}
+
+.cookie-modal-body {
+    padding: 20px;
+}
+
+.cookie-category-item {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.cookie-category-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.cookie-category-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.cookie-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.cookie-category-header label {
+    font-weight: 600;
+    color: #1a5490;
+    cursor: pointer;
+    margin: 0;
+}
+
+.cookie-category-description {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.cookie-modal-footer {
+    padding: 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .cookie-banner-content {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .cookie-banner-buttons {
+        justify-content: stretch;
+    }
+
+    .cookie-banner-buttons .btn {
+        flex: 1;
+        text-align: center;
+    }
+
+    .cookie-modal-content {
+        width: 95%;
+    }
+}
+
+/* Hidden state */
+.cookie-banner.hidden {
+    display: none;
+}
+</style>
+
+<!-- ========================================
+     JavaScript для управления Cookie-баннером
+     ======================================== -->
+
+<script>
+(function() {
+    const COOKIE_PREFERENCES_KEY = 'berezhnaya_cookie_preferences';
+    const COOKIE_BANNER_SHOWN_KEY = 'berezhnaya_cookie_banner_shown';
+
+    // Инициализация
+    function initCookieBanner() {
+        // Проверяем, были ли уже установлены предпочтения
+        const preferences = getCookiePreferences();
+
+        if (preferences) {
+            // Применяем сохранённые предпочтения
+            applyCookiePreferences(preferences);
+            hideBanner();
+        } else {
+            // Показываем баннер при первом визите
+            showBanner();
+        }
+
+        attachEventListeners();
+    }
+
+    // Получить сохранённые предпочтения
+    function getCookiePreferences() {
+        const cookie = document.cookie
+            .split('; ')
+            .find(row => row.startsWith(COOKIE_PREFERENCES_KEY + '='));
+
+        if (cookie) {
+            try {
+                return JSON.parse(decodeURIComponent(cookie.split('=')[1]));
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    // Сохранить предпочтения в cookie
+    function saveCookiePreferences(preferences) {
+        const date = new Date();
+        date.setFullYear(date.getFullYear() + 1); // На 1 год
+
+        document.cookie = `${COOKIE_PREFERENCES_KEY}=${encodeURIComponent(JSON.stringify(preferences))}; expires=${date.toUTCString()}; path=/`;
+    }
+
+    // Применить предпочтения (активировать услуги)
+    function applyCookiePreferences(preferences) {
+        // Активируем Яндекс.Метрику, если согласие дано
+        if (preferences.analytical) {
+            activateYandexMetrika();
+        }
+
+        // Активируем маркетинговые пиксели, если согласие дано
+        if (preferences.marketing) {
+            activateMarketingPixels();
+        }
+    }
+
+    // Активировать Яндекс.Метрику
+    function activateYandexMetrika() {
+        // Пример: раскомментируйте и добавьте ваш ID счётчика
+        /*
+        (function(m, e, t, r, i, k, a) {
+            m[i] = m[i] || function() {
+                (m[i].a = m[i].a || []).push(arguments)
+            };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) {
+                if (document.scripts[j].src === r) {
+                    return;
+                }
+            }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })
+        (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+        ym(YOUR_METRIC_ID, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true
+        });
+        */
+    }
+
+    // Активировать маркетинговые пиксели
+    function activateMarketingPixels() {
+        // Пример для Meta Pixel (Facebook)
+        /*
+        !function(f,b,e,v,n,t,s) {
+            if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            // ... Meta Pixel код
+        }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', 'YOUR_PIXEL_ID');
+        fbq('track', 'PageView');
+        */
+    }
+
+    // Показать баннер
+    function showBanner() {
+        const banner = document.getElementById('cookieBanner');
+        if (banner) {
+            banner.style.display = 'flex';
+        }
+    }
+
+    // Скрыть баннер
+    function hideBanner() {
+        const banner = document.getElementById('cookieBanner');
+        if (banner) {
+            banner.classList.add('hidden');
+        }
+    }
+
+    // Показать модальное окно
+    function showSettingsModal() {
+        const modal = document.getElementById('cookieSettingsModal');
+        if (modal) {
+            modal.style.display = 'flex';
+
+            // Загружаем сохранённые предпочтения в чекбоксы
+            const preferences = getCookiePreferences() || { analytical: false, marketing: false };
+            document.getElementById('cookieAnalytical').checked = preferences.analytical;
+            document.getElementById('cookieMarketing').checked = preferences.marketing;
+        }
+    }
+
+    // Закрыть модальное окно
+    function closeSettingsModal() {
+        const modal = document.getElementById('cookieSettingsModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // Обработчики событий
+    function attachEventListeners() {
+        // Принять все
+        const acceptAllBtn = document.getElementById('cookieAcceptAll');
+        if (acceptAllBtn) {
+            acceptAllBtn.addEventListener('click', function() {
+                const preferences = {
+                    necessary: true,
+                    analytical: true,
+                    marketing: true
+                };
+                saveCookiePreferences(preferences);
+                applyCookiePreferences(preferences);
+                hideBanner();
+            });
+        }
+
+        // Только необходимые
+        const rejectBtn = document.getElementById('cookieReject');
+        if (rejectBtn) {
+            rejectBtn.addEventListener('click', function() {
+                const preferences = {
+                    necessary: true,
+                    analytical: false,
+                    marketing: false
+                };
+                saveCookiePreferences(preferences);
+                hideBanner();
+            });
+        }
+
+        // Открыть настройки
+        const settingsBtn = document.getElementById('cookieSettings');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', showSettingsModal);
+        }
+
+        // Закрыть модальное окно
+        const closeBtn = document.getElementById('cookieModalClose');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeSettingsModal);
+        }
+
+        // Сохранить настройки
+        const saveBtn = document.getElementById('cookieSaveSettings');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function() {
+                const preferences = {
+                    necessary: true,
+                    analytical: document.getElementById('cookieAnalytical').checked,
+                    marketing: document.getElementById('cookieMarketing').checked
+                };
+                saveCookiePreferences(preferences);
+                applyCookiePreferences(preferences);
+                closeSettingsModal();
+                hideBanner();
+            });
+        }
+
+        // Закрыть модальное окно при клике на затемнение
+        const modal = document.getElementById('cookieSettingsModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeSettingsModal();
+                }
+            });
+        }
+    }
+
+    // Запуск при загрузке страницы
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCookieBanner);
+    } else {
+        initCookieBanner();
+    }
+})();
+</script>

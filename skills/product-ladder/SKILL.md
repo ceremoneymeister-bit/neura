@@ -11,6 +11,14 @@ triggers: [продуктовая линейка, product ladder, тарифы, 
 risk: safe
 source: internal
 maturity: growing
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый продукт/клиент"
+proactive_trigger_1_action: "предложить продуктовую линейку"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Product Ladder — Проектирование продуктовой лестницы
@@ -280,3 +288,9 @@ maturity: growing
 - **НЕЧ20 / Дополнительно / Декомпозиция цели** (Михаил Дашкиев) — формула P×Q, "шаг назад", таблица декомпозиции, примеры расчётов
 - **НЕЧ20 / Вебинар / vebinar-c1** — иллюзия 3 тарифов (минус/центр/плюс), проектирование комплектаций
 - **Тимочко / timochko_pdfs_extracted** — 8-шаговый концепт продукта, шаблон тарифов, wow-фишки, болеутолители
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

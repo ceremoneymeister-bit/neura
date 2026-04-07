@@ -12,6 +12,17 @@ source: internal
 usage_count: 2
 last_used: 2026-03-31
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: threshold
+proactive_trigger_1_condition: "errors_today > 5 в journalctl/Docker"
+proactive_trigger_1_action: "запустить проактивную форензику"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "бот не отвечает > 5 мин"
+proactive_trigger_2_action: "автоматическая диагностика"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Systematic Debugging v2 — Proactive Forensics
@@ -306,3 +317,25 @@ From debugging sessions:
 - **Симптом:** GeneratorExit → Event loop is closed → RuntimeError
 - **Причина:** LiveStatus (async loop каждые 3с) и asyncio.create_subprocess_exec конкурируют. При shutdown — race condition
 - **Фикс:** убрать LiveStatus, использовать on_progress callback от execute_always_deep
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+### 2026-03-19 — v2: проактивная форензика
+- Баг Марины: двойной _extract_and_send_files (voice+document), safe-restart не ждал Claude CLI
+- SIGTERM-aware ошибки внедрены в 3 ботов, systemd TimeoutStopSec=45
+- Phase 0: шкала проактивности 0.8-2.2, bot-forensics-checklist.md
+- Урок: safe-restart ДОЛЖЕН ждать Claude CLI (до 120с), иначе SIGTERM → "Техническая ошибка"
+- Урок: systemd TimeoutStopSec >= 45 для ботов с Claude CLI subprocess
+
+### 2026-03-31 — дебаг stream-json + --verbose + Neura App UFW
+- ВСЕ боты (Марина/Никита/Яна) → "Техническая ошибка" одновременно
+- Root cause #1: Claude CLI --verbose меняет stream-json (новые event types: assistant/result)
+- Root cause #2: --verbose пишет ошибки в stdout (JSON), не stderr → is_session_error не матчил
+- Параллельно: debugging Neura App (UFW Docker→Bridge, agents.use 403, MongoDB ban)
+- Антипаттерн: при "Техническая ошибка" — НЕ рестартовать. Сначала journalctl → rc код → root cause
+- Антипаттерн: парсить stderr для ошибок CLI = неполная картина. --verbose кладёт ВСЁ в stdout
+- Урок: фикс одного бота = немедленно патчить ВСЕ + эталон. "Обновил одного → забыл остальных" → повтор

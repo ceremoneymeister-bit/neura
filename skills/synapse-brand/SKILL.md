@@ -8,6 +8,14 @@ category: branding
 tags: [synapse, brand, children, school, ai, pdf, ppt, naming, design-system]
 risk: safe
 source: custom
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "брендинг-материалы школы"
+proactive_trigger_1_action: "применить лайм+чёрный стиль"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Synapse Brand — брендинг школы AI-мышления
@@ -92,3 +100,9 @@ exec(open('.agent/skills/synapse-brand/references/ppt-template-config.md').read(
 - `ppt-generator` — для генерации PPT
 - `frontend-design` — для веб-компонентов
 - `tailwind-patterns` — для Tailwind CSS
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

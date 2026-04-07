@@ -13,6 +13,17 @@ source: internal
 usage_count: 2
 last_used: 2026-04-01
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "создание/улучшение скилла"
+proactive_trigger_1_action: "TDD + scoring workflow"
+proactive_trigger_2_type: threshold
+proactive_trigger_2_condition: "задача повторяется 3+ раз без скилла"
+proactive_trigger_2_action: "предложить создать seed-скилл"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog, scoring-criteria]
 ---
 
 # skill-creator
@@ -480,3 +491,22 @@ Add line to SESSION_LOG.md.
 - `references/skill-template.md` — Simple and Advanced SKILL.md templates with comments
 - `references/workflows.md` — Workflow pattern examples from real skills
 - `references/output-patterns.md` — Scoring, severity, checklist, and comparison patterns
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+### 2026-03-25 — апгрейд v2→v3: Phase 4.5 + скоринг
+- Создана Phase 4.5 (6 чеков: Executability, Portability, Data Schema, Scoring Calibration, Safety, Self-Test)
+- 6-я ось скоринга: Executability (6×10=60 вместо 5×10=50)
+- 3 антипаттерна из smart-outreach: "Auto без кода" (заявка авто-обновления без реального кода), "Hardcoded owner" (12 шаблонов с хардкодом), "Self-scoring inflation" (CLEAR давал 22-25/25 без негативных примеров)
+- Антипаттерн: скоринг без калибровочных пар (и плохой, и хороший пример) = Claude всегда ставит 5/5
+- Урок: Phase 4.5 ловит crash-баги которые Phase 4 пропускает. ОБЯЗАТЕЛЬНА даже в Quick Mode
+
+### 2026-04-01 — глубокий аудит visual-replication + Quick Mode fix
+- Phase 4.5 + Phase 5: 7 проблем (crash на невалидных файлах, inline-Playwright, нет калибровки, нет проактивности)
+- Score: 38→50/60. Создан visual-screenshot.py
+- Quick Mode ОБЯЗАТЕЛЬНО включает Phase 4.5. Ранее пропускал → crash-баги
+- Урок: при аудите проверять не только SKILL.md, но и все скрипты на реальных данных (невалидный файл, пустой ввод)

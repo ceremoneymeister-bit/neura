@@ -1,6 +1,14 @@
 ---
 name: test-driven-development
 description: Use when implementing any feature or bugfix, before writing implementation code
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый модуль/функция"
+proactive_trigger_1_action: "предложить TDD workflow"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Test-Driven Development (TDD)
@@ -369,3 +377,9 @@ Otherwise → not TDD
 ```
 
 No exceptions without your human partner's permission.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

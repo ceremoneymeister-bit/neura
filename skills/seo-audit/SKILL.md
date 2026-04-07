@@ -9,6 +9,17 @@ description: ">"
   schema-markup.
 risk: unknown
 source: community
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "после деплоя страницы"
+proactive_trigger_1_action: "проверить мета-теги, индексацию, sitemap"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "ежемесячно 1-е число"
+proactive_trigger_2_action: "полный SEO-аудит всех сайтов"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # SEO Audit
@@ -490,3 +501,9 @@ Use these skills **only after the audit is complete** and findings are accepted.
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

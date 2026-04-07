@@ -1,6 +1,14 @@
 ---
 name: verification-before-completion
 description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "завершение любой задачи"
+proactive_trigger_1_action: "запустить проверку результата"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Verification Before Completion
@@ -180,3 +188,9 @@ BEFORE claiming PDF is ready:
 Run the command. Read the output. THEN claim the result.
 
 This is non-negotiable.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

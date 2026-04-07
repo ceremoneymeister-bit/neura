@@ -30,7 +30,7 @@ class TestCapsuleToEngine:
 
         assert isinstance(ecfg, EngineConfig)
         engine = ClaudeEngine()
-        cmd = engine._build_cmd("test prompt", ecfg)
+        cmd, _ = engine._build_cmd("test prompt", ecfg)
         assert isinstance(cmd, list)
         assert "claude" in cmd
         assert ecfg.model in cmd

@@ -20,7 +20,7 @@ export function NewChatButton({ onClick, loading = false }: NewChatButtonProps) 
       onClick={onClick}
       disabled={loading}
       title="Новый чат (Ctrl+Shift+N)"
-      className="w-full flex items-center gap-2 h-8 px-3 rounded-[6px] bg-[#7c3aed] text-white text-sm font-medium hover:bg-[#6d28d9] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full flex items-center gap-2 h-8 px-3 rounded-md bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent-hover)] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? <Spinner size="sm" /> : <Plus size={14} />}
       <span className="flex-1 text-left text-xs">Новый чат</span>

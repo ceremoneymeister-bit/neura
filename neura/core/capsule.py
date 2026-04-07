@@ -79,6 +79,9 @@ class CapsuleConfig:
     rate_limit: dict = field(default_factory=lambda: {"max_per_day": 100, "warn_at": 50})
     trial: dict = field(default_factory=lambda: {"enabled": False})
     home_dir: str | None = None
+    internal_groups: list[int] = field(default_factory=list)
+    mention_required_groups: list[int] = field(default_factory=list)
+    heartbeat: list[dict] = field(default_factory=list)
 
 
 class Capsule:
@@ -130,6 +133,9 @@ class Capsule:
             rate_limit=data.get("rate_limit", dict(DEFAULT_RATE_LIMIT)),
             trial=data.get("trial", {"enabled": False}),
             home_dir=str(Path(os.environ.get("NEURA_HOMES_DIR", DEFAULT_HOMES_DIR)) / data["id"]),
+            internal_groups=[int(g) for g in data.get("internal_groups", [])],
+            mention_required_groups=[int(g) for g in data.get("mention_required_groups", [])],
+            heartbeat=data.get("heartbeat", []),
         )
 
         logger.info(f"Loaded capsule: {cfg.id} ({cfg.name})")

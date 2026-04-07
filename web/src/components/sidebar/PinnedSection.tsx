@@ -1,12 +1,15 @@
 import { X } from 'lucide-react'
 import { type Conversation, updateConversation } from '@/api/conversations'
 import { type Project, updateProject } from '@/api/projects'
+import { PinIcon } from '@/components/ui/NeuraIcon'
 
 interface PinnedSectionProps {
   conversations: Conversation[]
   projects: Project[]
   activeId?: string
+  unreadIds?: Set<number>
   onNavigate: (id: number) => void
+  onProjectNavigate?: (projectId: number) => void
   onReload: () => void
 }
 
@@ -14,7 +17,9 @@ export function PinnedSection({
   conversations,
   projects,
   activeId,
+  unreadIds,
   onNavigate,
+  onProjectNavigate,
   onReload,
 }: PinnedSectionProps) {
   if (conversations.length === 0 && projects.length === 0) return null
@@ -39,8 +44,8 @@ export function PinnedSection({
 
   return (
     <div className="mt-2">
-      <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#525252]">
-        📌 Закреплённые
+      <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+        <PinIcon size={10} /> Закреплённые
       </p>
 
       {projects.map((p) => (
@@ -48,7 +53,7 @@ export function PinnedSection({
           key={`project-${p.id}`}
           label={`${p.icon} ${p.name}`}
           active={false}
-          onNavigate={() => {}}
+          onNavigate={() => onProjectNavigate?.(p.id)}
           onUnpin={() => handleUnpinProject(p.id)}
         />
       ))}
@@ -58,6 +63,7 @@ export function PinnedSection({
           key={`conv-${c.id}`}
           label={c.title}
           active={String(c.id) === activeId}
+          unread={!!(unreadIds?.has(c.id) && String(c.id) !== activeId)}
           onNavigate={() => onNavigate(c.id)}
           onUnpin={() => handleUnpinConv(c.id)}
         />
@@ -69,11 +75,13 @@ export function PinnedSection({
 function PinnedItem({
   label,
   active,
+  unread = false,
   onNavigate,
   onUnpin,
 }: {
   label: string
   active: boolean
+  unread?: boolean
   onNavigate: () => void
   onUnpin: () => void
 }) {
@@ -81,16 +89,21 @@ function PinnedItem({
     <div
       className={[
         'group flex items-center gap-1 px-2 py-1 rounded-[6px] transition-colors',
-        active ? 'bg-[#7c3aed]/15' : 'hover:bg-[#1a1a1a]',
+        active ? 'bg-[var(--accent)]/15' : 'hover:bg-[var(--bg-hover)]',
       ].join(' ')}
     >
+      {unread && (
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+      )}
       <button
         onClick={onNavigate}
         className={[
           'flex-1 text-left text-xs truncate transition-colors',
           active
-            ? 'text-[#f5f5f5] font-medium'
-            : 'text-[#a3a3a3] group-hover:text-[#f5f5f5]',
+            ? 'text-[var(--text-primary)] font-medium'
+            : unread
+              ? 'text-[var(--text-primary)] font-medium'
+              : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]',
         ].join(' ')}
       >
         {label}
@@ -101,7 +114,7 @@ function PinnedItem({
           onUnpin()
         }}
         title="Открепить"
-        className="opacity-0 group-hover:opacity-100 p-0.5 text-[#525252] hover:text-red-400 transition-all"
+        className="opacity-0 group-hover:opacity-100 p-0.5 text-[var(--text-muted)] hover:text-red-400 transition-all"
       >
         <X size={11} />
       </button>

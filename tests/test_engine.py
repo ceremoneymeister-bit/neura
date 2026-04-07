@@ -79,7 +79,7 @@ class TestBuildCmd:
         from neura.core.engine import ClaudeEngine, EngineConfig
         engine = ClaudeEngine()
         cfg = EngineConfig()
-        cmd = engine._build_cmd("Hello", cfg)
+        cmd, _ = engine._build_cmd("Hello", cfg)
         assert "claude" in cmd
         assert "-p" in cmd
         assert "Hello" in cmd
@@ -94,7 +94,7 @@ class TestBuildCmd:
         from neura.core.engine import ClaudeEngine, EngineConfig
         engine = ClaudeEngine()
         cfg = EngineConfig(model="opus")
-        cmd = engine._build_cmd("Test", cfg)
+        cmd, _ = engine._build_cmd("Test", cfg)
         idx = cmd.index("--model")
         assert cmd[idx + 1] == "opus"
 
@@ -102,14 +102,14 @@ class TestBuildCmd:
         from neura.core.engine import ClaudeEngine, EngineConfig
         engine = ClaudeEngine()
         # standard = no --effort flag
-        cmd_std = engine._build_cmd("Test", EngineConfig(effort="standard"))
+        cmd_std, _ = engine._build_cmd("Test", EngineConfig(effort="standard"))
         assert "--effort" not in cmd_std
         # low
-        cmd_low = engine._build_cmd("Test", EngineConfig(effort="low"))
+        cmd_low, _ = engine._build_cmd("Test", EngineConfig(effort="low"))
         idx = cmd_low.index("--effort")
         assert cmd_low[idx + 1] == "low"
         # high
-        cmd_high = engine._build_cmd("Test", EngineConfig(effort="high"))
+        cmd_high, _ = engine._build_cmd("Test", EngineConfig(effort="high"))
         idx = cmd_high.index("--effort")
         assert cmd_high[idx + 1] == "high"
 
@@ -117,14 +117,14 @@ class TestBuildCmd:
         from neura.core.engine import ClaudeEngine, EngineConfig
         engine = ClaudeEngine()
         cfg = EngineConfig(allowed_tools=["Read", "Grep", "WebSearch"])
-        cmd = engine._build_cmd("Test", cfg)
+        cmd, _ = engine._build_cmd("Test", cfg)
         assert "--allowedTools" in cmd
 
     def test_append_system_prompt(self):
         from neura.core.engine import ClaudeEngine, EngineConfig
         engine = ClaudeEngine()
         cfg = EngineConfig(append_system_prompt="Be concise")
-        cmd = engine._build_cmd("Test", cfg)
+        cmd, _ = engine._build_cmd("Test", cfg)
         assert "--append-system-prompt" in cmd
         idx = cmd.index("--append-system-prompt")
         assert cmd[idx + 1] == "Be concise"

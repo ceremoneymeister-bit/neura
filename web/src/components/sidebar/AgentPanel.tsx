@@ -69,7 +69,7 @@ export function AgentPanel() {
       {/* Collapsed header — always visible */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#1a1a1a] transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] transition-colors"
       >
         {/* Status dot with glow when online */}
         <span
@@ -81,30 +81,30 @@ export function AgentPanel() {
           ].join(' ')}
         />
 
-        <span className="flex-1 text-left text-[11px] text-[#a3a3a3] truncate">
-          {capsuleName ? `🤖 ${capsuleName}` : isOnline ? '🤖 Агент' : '🤖 Офлайн'}
+        <span className="flex-1 text-left text-[11px] text-[var(--text-secondary)] truncate">
+          {capsuleName ?? (isOnline ? 'Агент' : 'Офлайн')}
         </span>
 
-        <span className="text-[10px] text-[#525252] font-mono flex-shrink-0">
+        <span className="text-[10px] text-[var(--text-muted)] font-mono flex-shrink-0">
           {modelLabel(model)}
         </span>
 
         {open
-          ? <ChevronUp size={11} className="text-[#525252] flex-shrink-0" />
-          : <ChevronDown size={11} className="text-[#525252] flex-shrink-0" />}
+          ? <ChevronUp size={11} className="text-[var(--text-muted)] flex-shrink-0" />
+          : <ChevronDown size={11} className="text-[var(--text-muted)] flex-shrink-0" />}
       </button>
 
       {/* Expanded panel */}
       {open && (
         <div className="px-3 pb-3 space-y-2">
           {/* Status row */}
-          <div className="flex items-center gap-2 text-[11px] text-[#525252]">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <Activity size={11} />
             <span>Статус</span>
             <span
               className={[
                 'ml-auto font-medium',
-                isOnline ? 'text-emerald-400' : 'text-[#525252]',
+                isOnline ? 'text-emerald-400' : 'text-[var(--text-muted)]',
               ].join(' ')}
             >
               {isOnline ? 'Online' : 'Offline'}
@@ -112,17 +112,17 @@ export function AgentPanel() {
           </div>
 
           {/* Model row */}
-          <div className="flex items-center gap-2 text-[11px] text-[#525252]">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <Cpu size={11} />
             <span>Модель</span>
-            <span className="ml-auto text-[#a3a3a3] font-mono">{modelLabel(model)}</span>
+            <span className="ml-auto text-[var(--text-secondary)] font-mono">{modelLabel(model)}</span>
           </div>
 
           {/* Requests row */}
-          <div className="flex items-center gap-2 text-[11px] text-[#525252]">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <Zap size={11} />
             <span>Запросы</span>
-            <span className="ml-auto text-[#a3a3a3]">
+            <span className="ml-auto text-[var(--text-secondary)]">
               {reqTotal} req
               {errTotal > 0 && (
                 <span className="text-red-400 ml-1">· {errTotal} err</span>
@@ -132,24 +132,24 @@ export function AgentPanel() {
 
           {/* Average duration */}
           {avgDur !== undefined && avgDur > 0 && (
-            <div className="flex items-center gap-2 text-[11px] text-[#525252]">
+            <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
               <span className="w-[11px] text-center">⏱</span>
               <span>Среднее</span>
-              <span className="ml-auto text-[#a3a3a3]">{avgDur.toFixed(1)}s</span>
+              <span className="ml-auto text-[var(--text-secondary)]">{avgDur.toFixed(1)}s</span>
             </div>
           )}
 
           {/* Skills badges */}
           {skills.length > 0 && (
             <div>
-              <p className="text-[10px] text-[#525252] mb-1">
+              <p className="text-[10px] text-[var(--text-muted)] mb-1">
                 Скиллы ({skills.length})
               </p>
               <div className="flex flex-wrap gap-1">
                 {skills.map((s) => (
                   <span
                     key={s}
-                    className="px-1.5 py-0.5 rounded-[4px] bg-[#1a1a1a] border border-[#262626] text-[#a3a3a3] text-[10px]"
+                    className="px-1.5 py-0.5 rounded-[4px] bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-secondary)] text-[10px]"
                   >
                     {s}
                   </span>
@@ -160,7 +160,7 @@ export function AgentPanel() {
 
           {/* No data yet placeholder */}
           {!metrics && (
-            <p className="text-[10px] text-[#525252] text-center py-1">
+            <p className="text-[10px] text-[var(--text-muted)] text-center py-1">
               Загрузка данных...
             </p>
           )}

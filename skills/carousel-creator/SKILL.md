@@ -11,6 +11,17 @@ risk: safe
 maturity: growing
 usage_count: 1
 last_used: 2026-04-01
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "среда"
+proactive_trigger_1_action: "предложить карусель для Instagram"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "контент для Instagram"
+proactive_trigger_2_action: "предложить формат карусели"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # carousel-creator — Создание Instagram-каруселей
@@ -333,3 +344,20 @@ Green:
 - [Instagram Carousel Best Practices](https://blog.hootsuite.com/instagram-carousel/) — Hootsuite
 - [Best Practices for Carousels 2026](https://metricool.com/instagram-carousels/) — Metricool
 - Источники маркетинговых фреймворков: НЕЧ20 (4U, CTA stress matrix, Theme-Rheme flow), Тимочко (бустеры охватов)
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+- 2026-04-07: 9 использований, success rate 100.0%, avg latency 60.0s
+- 2026-04-07: 8 использований, success rate 100.0%, avg latency 58.9s
+- 2026-04-07: 7 использований, success rate 100.0%, avg latency 57.1s
+- 2026-04-07: 6 использований, success rate 100.0%, avg latency 55.2s
+- 2026-04-06: 5 использований, success rate 100.0%, avg latency 48.1s

@@ -1,5 +1,11 @@
 """Neura v2 — Application entry point.
 
+@arch scope=platform  affects=all_capsules(14)
+@arch depends=ALL core modules, ALL transport modules
+@arch risk=CRITICAL  restart=neura-v2
+@arch role=Single entry point. Initializes DB, Redis, Engine, Memory, Queue, Transport.
+@arch note=SIGTERM/SIGINT graceful shutdown. Start order matters (DB→Redis→Engine→Transport).
+
 Init: DB pool + Redis + Engine + MemoryStore + Queue.
 Load capsules from YAML. Start TelegramTransport.
 Graceful shutdown on SIGTERM/SIGINT.
@@ -16,6 +22,9 @@ from neura.core.engine import ClaudeEngine
 from neura.core.memory import MemoryStore
 from neura.core.queue import RequestQueue
 from neura.core.skills import SkillRegistry
+from neura.core.skill_learning import SkillUsageCollector, SkillEvolver
+from neura.core.heartbeat import HeartbeatEngine, parse_heartbeat_config
+from neura.core.proactive import ProactiveEngine
 from neura.monitoring import setup_monitoring, SERVICE_START, SERVICE_STOP
 from neura.storage.cache import Cache
 from neura.storage.db import Database
@@ -55,6 +64,11 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
     memory = MemoryStore(db.pool)
     queue = RequestQueue(cache.redis)
 
+    # 3b. Clear stale processing locks from previous run
+    cleared = await queue.clear_all_processing_locks()
+    if cleared:
+        logger.info(f"Cleared {cleared} stale processing lock(s) from previous run")
+
     # 4. Load capsules + skills
     capsules = Capsule.load_all(config_dir)
     if not capsules:
@@ -81,12 +95,96 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
     # 6. Monitoring
     monitoring = await setup_monitoring(db.pool, cache.redis, capsules)
 
+    # 6b. Skill learning
+    skill_collector = SkillUsageCollector(db.pool)
+    skill_evolver = SkillEvolver(skill_collector)
+    logger.info("Skill learning engine initialized")
+
+    # 6c. Proactive engine
+    proactive_engine = ProactiveEngine(
+        skill_registry, db.pool, cache.redis,
+        alert_sender=monitoring["alert_sender"],
+        metrics_collector=monitoring["metrics"],
+        capsules=capsules,
+    )
+
+    # 6d. Heartbeat engine (per-capsule periodic reminders)
+    async def _heartbeat_send(capsule_id: str, telegram_id: int, message: str):
+        """Send heartbeat message via capsule's bot."""
+        cap = capsules.get(capsule_id)
+        if not cap:
+            return
+        from telegram import Bot
+        bot = Bot(token=cap.config.bot_token)
+        try:
+            await bot.send_message(chat_id=telegram_id, text=f"💓 {message}")
+        except Exception as e:
+            logger.warning(f"Heartbeat send failed {capsule_id}→{telegram_id}: {e}")
+        finally:
+            await bot.shutdown()
+
+    async def _heartbeat_run_task(capsule_id: str, telegram_id: int, prompt: str):
+        """Run a prompt through Claude engine and send result to user."""
+        cap = capsules.get(capsule_id)
+        if not cap:
+            return
+        from neura.core.engine import EngineConfig
+        from neura.core.context import ContextBuilder, ContextParts
+
+        try:
+            # Build context with diary/memory
+            parts = await memory.build_context_parts(cap, prompt)
+            builder = ContextBuilder(cap)
+            full_prompt = builder.build(prompt, parts, is_first_message=True)
+
+            cfg = EngineConfig(capsule_id=capsule_id)
+            result = await engine.run(full_prompt, cfg)
+
+            # Send result via bot
+            from telegram import Bot
+            bot = Bot(token=cap.config.bot_token)
+            try:
+                text = result[:4000] if len(result) > 4000 else result
+                await bot.send_message(chat_id=telegram_id, text=f"⚡ {text}")
+            finally:
+                await bot.shutdown()
+
+            # Write diary
+            await memory.add_diary(capsule_id, prompt, result[:500])
+            logger.info(f"Heartbeat task done: {capsule_id}, {len(result)} chars")
+        except Exception as e:
+            logger.error(f"Heartbeat task failed {capsule_id}: {e}", exc_info=True)
+            # Notify user about failure
+            from telegram import Bot
+            bot = Bot(token=cap.config.bot_token)
+            try:
+                await bot.send_message(
+                    chat_id=telegram_id,
+                    text=f"⚠️ Автозадача не выполнена: {str(e)[:200]}"
+                )
+            except Exception:
+                pass
+            finally:
+                await bot.shutdown()
+
+    heartbeat_engine = HeartbeatEngine(cache.redis, _heartbeat_send, _heartbeat_run_task)
+    for cap in capsules.values():
+        if cap.config.heartbeat:
+            hb_tasks = parse_heartbeat_config(
+                cap.config.id, cap.config.owner_telegram_id,
+                cap.config.heartbeat,
+            )
+            heartbeat_engine.register_tasks(hb_tasks)
+
     # 7. Transport
     transport = TelegramTransport(
         capsules, engine, memory, queue,
         metrics=monitoring["metrics"],
         alert_sender=monitoring["alert_sender"],
+        skill_collector=skill_collector,
+        skill_evolver=skill_evolver,
     )
+    transport.set_onboarding(cache.redis)
 
     # 8. Web API (FastAPI + uvicorn)
     web_app = create_web_app(db.pool, engine, memory, queue, capsules)
@@ -100,6 +198,8 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         "capsules": capsules,
         "transport": transport,
         "monitoring": monitoring,
+        "proactive": proactive_engine,
+        "heartbeat": heartbeat_engine,
         "web_app": web_app,
     }
 
@@ -108,7 +208,17 @@ async def shutdown(app: dict) -> None:
     """Graceful shutdown: monitoring → transport → cache → db."""
     logger.info("Shutting down...")
 
-    # Stop monitoring first
+    # Stop heartbeat engine
+    heartbeat = app.get("heartbeat")
+    if heartbeat:
+        await heartbeat.stop()
+
+    # Stop proactive engine
+    proactive = app.get("proactive")
+    if proactive:
+        await proactive.stop()
+
+    # Stop monitoring
     monitoring = app.get("monitoring")
     if monitoring:
         await monitoring["health"].stop()
@@ -166,6 +276,28 @@ async def main() -> None:
     alert_sender = monitoring["alert_sender"]
 
     await health.start()
+
+    # Preload vector search models in background thread
+    # (so first user request doesn't wait 15+ seconds for model load)
+    import threading
+    def _preload_vector_models():
+        try:
+            from neura.core.vectordb import _get_model, _get_reranker
+            _get_model()
+            _get_reranker()
+            logger.info("Vector models preloaded")
+        except Exception as e:
+            logger.warning(f"Vector model preload failed (will retry on first search): {e}")
+    threading.Thread(target=_preload_vector_models, daemon=True).start()
+
+    # Start proactive engine
+    proactive = app["proactive"]
+    await proactive.start()
+
+    # Start heartbeat engine
+    heartbeat = app["heartbeat"]
+    await heartbeat.start()
+
     capsule_count = len(app["capsules"])
     await alert_sender.send(
         f"Запущено {capsule_count} капсул(а)",

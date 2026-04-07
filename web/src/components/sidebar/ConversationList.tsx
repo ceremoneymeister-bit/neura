@@ -1,13 +1,14 @@
 import {
   type KeyboardEvent,
+  useMemo,
   useRef,
   useState,
   useCallback,
-  useMemo,
 } from 'react'
 import {
   Check,
   Folder,
+  MessageSquare,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -20,13 +21,15 @@ import {
   deleteConversation,
   updateConversation,
 } from '@/api/conversations'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { type Project } from '@/api/projects'
-import { formatRelativeTime } from '@/utils/time'
+import { useToast } from '@/components/ui/Toast'
 
 interface ConversationListProps {
   conversations: Conversation[]
   projects: Project[]
   activeId?: string
+  unreadIds?: Set<number>
   onNavigate: (id: number) => void
   onReload: () => void
 }
@@ -37,51 +40,40 @@ interface CtxMenuState {
   y: number
 }
 
-interface DateGroup {
-  label: string
-  items: Conversation[]
-}
+type DateGroup = 'Сегодня' | 'Вчера' | 'Эта неделя' | 'Этот месяц' | 'Ранее'
 
-function groupByDate(conversations: Conversation[]): DateGroup[] {
+const DATE_GROUP_ORDER: DateGroup[] = ['Сегодня', 'Вчера', 'Эта неделя', 'Этот месяц', 'Ранее']
+
+function getDateGroup(dateStr: string | null): DateGroup {
+  if (!dateStr) return 'Ранее'
   const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today.getTime() - 86400000)
-  const weekAgo = new Date(today.getTime() - 7 * 86400000)
+  const d = new Date(dateStr)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffMs = todayStart.getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
 
-  const groups: Record<string, Conversation[]> = {
-    '\u0421\u0435\u0433\u043E\u0434\u043D\u044F': [],
-    '\u0412\u0447\u0435\u0440\u0430': [],
-    '\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0435 7 \u0434\u043D\u0435\u0439': [],
-    '\u0420\u0430\u043D\u0435\u0435': [],
-  }
-
-  for (const conv of conversations) {
-    const date = new Date(conv.updated_at ?? conv.created_at ?? '')
-    if (date >= today) groups['\u0421\u0435\u0433\u043E\u0434\u043D\u044F'].push(conv)
-    else if (date >= yesterday) groups['\u0412\u0447\u0435\u0440\u0430'].push(conv)
-    else if (date >= weekAgo) groups['\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0435 7 \u0434\u043D\u0435\u0439'].push(conv)
-    else groups['\u0420\u0430\u043D\u0435\u0435'].push(conv)
-  }
-
-  return Object.entries(groups)
-    .filter(([, items]) => items.length > 0)
-    .map(([label, items]) => ({ label, items }))
+  if (diffDays <= 0) return 'Сегодня'
+  if (diffDays <= 1) return 'Вчера'
+  if (diffDays <= 7) return 'Эта неделя'
+  if (diffDays <= 30) return 'Этот месяц'
+  return 'Ранее'
 }
 
 export function ConversationList({
   conversations,
   projects,
   activeId,
+  unreadIds,
   onNavigate,
   onReload,
 }: ConversationListProps) {
+  const { error: showError } = useToast()
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
+  const [deleteConv, setDeleteConv] = useState<Conversation | null>(null)
   const [renamingId, setRenamingId] = useState<number | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
-
-  const groups = useMemo(() => groupByDate(conversations), [conversations])
 
   const openCtx = useCallback((e: React.MouseEvent, conv: Conversation) => {
     e.preventDefault()
@@ -102,6 +94,7 @@ export function ConversationList({
       onReload()
     } catch (e) {
       console.error(e)
+      showError('Не удалось обновить чат')
     }
   }
 
@@ -123,6 +116,7 @@ export function ConversationList({
       onReload()
     } catch (e) {
       console.error(e)
+      showError('Не удалось переименовать чат')
     }
   }
 
@@ -138,6 +132,7 @@ export function ConversationList({
       onReload()
     } catch (e) {
       console.error(e)
+      showError('Не удалось переместить чат')
     }
   }
 
@@ -148,21 +143,24 @@ export function ConversationList({
       onReload()
     } catch (e) {
       console.error(e)
+      showError('Не удалось удалить чат')
     }
   }
 
   const renderConversation = (c: Conversation) => {
     const isActive = String(c.id) === activeId
     const isRenaming = renamingId === c.id
+    const isUnread = !isActive && unreadIds?.has(c.id)
 
     return (
       <div
         key={c.id}
+        data-conv-nav
         className={[
-          'group relative flex items-center rounded-[6px] transition-colors',
+          'group relative flex items-center rounded-lg transition-colors',
           isActive
-            ? 'bg-[#7c3aed]/15 border-l-2 border-[#7c3aed]'
-            : 'hover:bg-[#1a1a1a]',
+            ? 'bg-[var(--bg-hover)]'
+            : 'hover:bg-[var(--bg-hover)]',
         ].join(' ')}
         onContextMenu={(e) => openCtx(e, c)}
       >
@@ -174,11 +172,13 @@ export function ConversationList({
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={handleRenameKey}
               onBlur={handleRenameCommit}
-              className="flex-1 h-5 px-1.5 rounded bg-[#1a1a1a] border border-[#7c3aed]/50 text-xs text-[#f5f5f5] focus:outline-none"
+              className="flex-1 h-5 px-1.5 rounded bg-[var(--bg-input)] border border-[var(--accent)]/50 text-xs text-[var(--text-primary)] focus:outline-none"
             />
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleRenameCommit}
+              aria-label="Подтвердить"
+              title="Подтвердить"
               className="text-emerald-400 hover:text-emerald-300 transition-colors"
             >
               <Check size={11} />
@@ -186,7 +186,9 @@ export function ConversationList({
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { setRenamingId(null); setRenameValue('') }}
-              className="text-[#525252] hover:text-red-400 transition-colors"
+              aria-label="Отменить"
+              title="Отменить"
+              className="text-[var(--text-muted)] hover:text-red-400 transition-colors"
             >
               <X size={11} />
             </button>
@@ -195,39 +197,33 @@ export function ConversationList({
           <>
             <button
               onClick={() => onNavigate(c.id)}
-              className="flex-1 text-left px-2 py-1.5 min-w-0"
+              className="flex-1 flex items-center gap-1.5 text-left px-2.5 py-2 min-w-0"
             >
+              {isUnread && (
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+              )}
               <p
                 className={[
-                  'text-xs truncate',
+                  'text-sm truncate',
                   isActive
-                    ? 'text-[#f5f5f5] font-medium'
-                    : 'text-[#a3a3a3] group-hover:text-[#f5f5f5]',
+                    ? 'text-[var(--text-primary)]'
+                    : isUnread
+                      ? 'text-[var(--text-primary)] font-medium'
+                      : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]',
                 ].join(' ')}
               >
                 {c.title}
               </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {c.last_message && (
-                  <p className="text-[10px] text-[#525252] truncate flex-1">
-                    {c.last_message}
-                  </p>
-                )}
-                {c.updated_at && (
-                  <span className="text-[10px] text-[#525252] flex-shrink-0">
-                    {formatRelativeTime(c.updated_at)}
-                  </span>
-                )}
-              </div>
             </button>
 
-            {/* Actions button */}
+            {/* "..." actions */}
             <button
               onClick={(e) => openCtx(e, c)}
               title="Действия"
-              className="mr-1 p-0.5 opacity-0 group-hover:opacity-100 text-[#525252] hover:text-[#a3a3a3] transition-all flex-shrink-0"
+              aria-label="Действия"
+              className="mr-1.5 p-0.5 hover-hide text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0"
             >
-              <MoreHorizontal size={13} />
+              <MoreHorizontal size={14} />
             </button>
           </>
         )}
@@ -235,50 +231,60 @@ export function ConversationList({
     )
   }
 
+  const grouped = useMemo(() => {
+    const groups = new Map<DateGroup, Conversation[]>()
+    for (const c of conversations) {
+      const g = getDateGroup(c.updated_at)
+      const arr = groups.get(g)
+      if (arr) arr.push(c)
+      else groups.set(g, [c])
+    }
+    return DATE_GROUP_ORDER
+      .filter((g) => groups.has(g))
+      .map((g) => ({ label: g, items: groups.get(g)! }))
+  }, [conversations])
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-6 text-center px-2.5">
+        <MessageSquare size={24} className="text-[var(--text-muted)]/30 mb-2" />
+        <p className="text-xs text-[var(--text-muted)]">Нет чатов</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="mt-2">
-      {conversations.length === 0 ? (
-        <p className="text-[10px] text-[#525252] px-2 py-2 text-center">Нет чатов</p>
-      ) : (
-        groups.map((group) => (
-          <div key={group.label}>
-            <p className="px-2 py-1.5 text-[10px] font-medium text-[#525252] uppercase tracking-wider">
-              {group.label}
-            </p>
-            {group.items.map(renderConversation)}
+    <div className="space-y-0.5">
+      {grouped.map(({ label, items }) => (
+        <div key={label}>
+          <div className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider px-2.5 pt-3 pb-1.5">
+            {label}
           </div>
-        ))
-      )}
+          {items.map(renderConversation)}
+        </div>
+      ))}
 
       {/* Context menu */}
       {ctxMenu && (
         <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-40" onClick={closeCtx} />
-
-          {/* Menu */}
+          <div className="fixed inset-0 z-40" onClick={closeCtx} onKeyDown={(e) => e.key === 'Escape' && closeCtx()} tabIndex={-1} />
           <div
-            className="fixed z-50 min-w-[168px] bg-[#1e1e1e] border border-[#2a2a2a] rounded-[8px] shadow-2xl py-1 text-xs"
+            className="fixed z-50 min-w-[168px] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-2xl py-1 text-xs"
             style={{
               left: Math.min(ctxMenu.x, window.innerWidth - 190),
               top: Math.min(ctxMenu.y, window.innerHeight - 220),
             }}
           >
-            {/* Pin / Unpin */}
             <CtxItem
               icon={ctxMenu.conv.pinned ? <PinOff size={12} /> : <Pin size={12} />}
               label={ctxMenu.conv.pinned ? 'Открепить' : 'Закрепить'}
               onClick={() => handlePin(ctxMenu.conv)}
             />
-
-            {/* Rename */}
             <CtxItem
               icon={<Pencil size={12} />}
               label="Переименовать"
               onClick={() => handleRenameStart(ctxMenu.conv)}
             />
-
-            {/* Move to project */}
             {projects.length > 0 && (
               <>
                 <CtxItem
@@ -287,11 +293,11 @@ export function ConversationList({
                   onClick={() => setShowMoveSubmenu((v) => !v)}
                 />
                 {showMoveSubmenu && (
-                  <div className="border-t border-[#2a2a2a] mt-0.5 pt-0.5">
+                  <div className="border-t border-[var(--border)] mt-0.5 pt-0.5">
                     {ctxMenu.conv.project_id && (
                       <button
                         onClick={() => handleMove(ctxMenu.conv, null)}
-                        className="w-full text-left px-3 py-1.5 text-[#a3a3a3] hover:bg-[#262626] hover:text-[#f5f5f5] transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         {'\u2715'} Убрать из проекта
                       </button>
@@ -300,7 +306,7 @@ export function ConversationList({
                       <button
                         key={p.id}
                         onClick={() => handleMove(ctxMenu.conv, p.id)}
-                        className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-[#a3a3a3] hover:bg-[#262626] hover:text-[#f5f5f5] transition-colors"
+                        className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <span>{p.icon}</span>
                         <span className="truncate">{p.name}</span>
@@ -310,24 +316,31 @@ export function ConversationList({
                 )}
               </>
             )}
-
-            <div className="my-0.5 border-t border-[#2a2a2a]" />
-
-            {/* Delete */}
+            <div className="my-0.5 border-t border-[var(--border)]" />
             <CtxItem
               icon={<Trash2 size={12} />}
               label="Удалить"
-              onClick={() => handleDelete(ctxMenu.conv)}
+              onClick={() => { setDeleteConv(ctxMenu.conv); closeCtx() }}
               danger
             />
           </div>
         </>
       )}
+      <ConfirmDialog
+        open={deleteConv !== null}
+        onClose={() => setDeleteConv(null)}
+        onConfirm={async () => {
+          if (deleteConv) {
+            await handleDelete(deleteConv)
+            setDeleteConv(null)
+          }
+        }}
+        title="Удалить чат"
+        message={`Чат «${deleteConv?.title ?? ''}» будет удалён. Это действие нельзя отменить.`}
+      />
     </div>
   )
 }
-
-// -- Context menu item ---------------------------------------------------
 
 function CtxItem({
   icon,
@@ -347,7 +360,7 @@ function CtxItem({
         'w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors',
         danger
           ? 'text-red-400 hover:bg-red-500/10'
-          : 'text-[#a3a3a3] hover:bg-[#262626] hover:text-[#f5f5f5]',
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
       ].join(' ')}
     >
       {icon}

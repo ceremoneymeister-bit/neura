@@ -9,6 +9,14 @@ category: infrastructure
 tags: [mac, tailscale, ssh, files, remote, bridge]
 risk: medium
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужен файл с Mac / Figma / Canva"
+proactive_trigger_1_action: "подключиться через Tailscale SSH"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # mac-bridge — Удалённый доступ к Mac
@@ -140,3 +148,9 @@ ssh -o ConnectTimeout=5 dmitrijrostovcev@100.77.93.12 "echo MAC_READY" 2>/dev/nu
 - Tailscale = end-to-end WireGuard шифрование
 - SSH по ключу (не по паролю)
 - Только устройства в tailnet `ceremoneymeister@gmail.com` видят друг друга
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

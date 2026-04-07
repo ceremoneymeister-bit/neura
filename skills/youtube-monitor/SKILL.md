@@ -9,6 +9,14 @@ category: content
 tags: [youtube, monitoring, transcription, AI, digest, cron]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "ежедневно 08:00"
+proactive_trigger_1_action: "проверить новые видео на отслеживаемых каналах"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # YouTube Monitor — мониторинг AI-каналов
@@ -105,3 +113,9 @@ python3 scripts/youtube-monitor.py --channel UCqib0rC7oNo4dXr0RpbtYRg
 | Транскрибировать через Whisper/Deepgram | Дорого, YouTube сам отдаёт субтитры | youtube-transcript-api |
 | Вызывать Claude для всех видео | Трата бюджета на мусор | Keyword scoring → только score ≥ 5 |
 | Запускать чаще 1 раза в день | Видео выходят не каждый час | 1 раз/день достаточно |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -4,6 +4,14 @@ description: "Create distinctive, production-grade frontend interfaces with inte
 license: Complete terms in LICENSE.txt
 risk: unknown
 source: community
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "создание UI"
+proactive_trigger_1_action: "предложить дизайн-решения"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Frontend Design (Distinctive, Production-Grade)
@@ -336,3 +344,9 @@ thead th { padding: 7px 10px; font-size: 10px; }
 
 ## When to Use
 This skill is applicable to execute the workflow or actions described in the overview.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

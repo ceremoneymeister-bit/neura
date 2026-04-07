@@ -1,56 +1,52 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
-import { PanelLeft, ChevronDown, Sparkles } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Outlet, useParams } from 'react-router-dom'
+import { PanelLeft } from 'lucide-react'
 import { StatusBar } from './StatusBar'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const MODEL_OPTIONS = [
-  { id: 'sonnet-4-6', label: 'Sonnet 4.6', desc: 'Быстрый и умный' },
-  { id: 'opus-4-6', label: 'Opus 4.6', desc: 'Максимальный интеллект' },
-  { id: 'haiku-4-5', label: 'Haiku 4.5', desc: 'Сверхбыстрый' },
-]
-
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [selectedModel, setSelectedModel] = useState(MODEL_OPTIONS[0])
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const { id: chatId } = useParams<{ id?: string }>()
+  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), [])
 
-  // Keyboard shortcut: Ctrl+B — wired via global listener in App.tsx
+  // Keyboard shortcut: Ctrl+B
   useEffect(() => {
     const handler = () => toggleSidebar()
     document.addEventListener('neura:toggle-sidebar', handler)
     return () => document.removeEventListener('neura:toggle-sidebar', handler)
   }, [toggleSidebar])
 
-  // Close model dropdown on outside click
+  // Listen for conversation title updates from ChatView
   useEffect(() => {
-    if (!modelDropdownOpen) return
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false)
-      }
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      setChatTitle(detail?.title ?? null)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [modelDropdownOpen])
+    document.addEventListener('neura:set-chat-title', handler)
+    return () => document.removeEventListener('neura:set-chat-title', handler)
+  }, [])
+
+  // Reset title when leaving chat
+  useEffect(() => {
+    if (!chatId) setChatTitle(null)
+  }, [chatId])
 
   return (
-    <div className="flex h-full bg-[#0a0a0a] overflow-hidden">
+    <div className="flex h-full bg-[var(--bg-primary)] overflow-hidden">
       {/* Sidebar — desktop */}
       <AnimatePresence initial={false}>
         {sidebarOpen && (
           <motion.div
             key="sidebar"
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 280, opacity: 1 }}
+            animate={{ width: 260, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="hidden md:flex flex-col overflow-hidden shrink-0 border-r border-[#1a1a1a]"
-            style={{ minWidth: 0 }}
+            className="hidden md:flex flex-col overflow-hidden shrink-0 border-r border-[var(--border)]/40"
+            style={{ minWidth: 0, maxWidth: 260 }}
           >
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </motion.div>
@@ -73,10 +69,10 @@ export function AppLayout() {
               onClick={() => setSidebarOpen(false)}
             />
             <motion.div
-              className="relative z-50 flex flex-col w-72 bg-[#141414] border-r border-[#1a1a1a]"
-              initial={{ x: -280 }}
+              className="relative z-50 flex flex-col w-[260px] bg-[var(--bg-sidebar)] border-r border-[var(--border)]/40"
+              initial={{ x: -260 }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
+              exit={{ x: -260 }}
               transition={{ duration: 0.2, ease: 'easeInOut' }}
             >
               <Sidebar onClose={() => setSidebarOpen(false)} />
@@ -88,87 +84,24 @@ export function AppLayout() {
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Top bar */}
-        <div className="flex items-center gap-2 px-3 h-11 border-b border-[#1a1a1a] shrink-0">
-          {/* Left: toggle + title */}
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 rounded-[6px] text-[#525252] hover:text-[#f5f5f5] hover:bg-[#1a1a1a] transition-colors shrink-0"
-            title="Toggle sidebar (Ctrl+B)"
-          >
-            <PanelLeft size={16} />
-          </button>
-
-          <span className="text-sm text-[#a3a3a3] truncate select-none">
-            Новый чат
-          </span>
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Right: model selector pill */}
-          <div className="relative hidden sm:block" ref={dropdownRef}>
+        <div className="flex items-center gap-2 px-3 h-11 shrink-0">
+          {/* Show sidebar toggle ONLY when sidebar is hidden */}
+          {!sidebarOpen && (
             <button
-              onClick={() => setModelDropdownOpen((v) => !v)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#262626] bg-[#141414] hover:border-[#7c3aed]/40 hover:bg-[#7c3aed]/5 transition-all text-xs text-[#a3a3a3] hover:text-[#f5f5f5]"
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              title="Открыть панель (Ctrl+B)"
             >
-              <Sparkles size={12} className="text-[#7c3aed]" />
-              <span>{selectedModel.label}</span>
-              <ChevronDown
-                size={12}
-                className={`transition-transform duration-150 ${modelDropdownOpen ? 'rotate-180' : ''}`}
-              />
+              <PanelLeft size={16} />
             </button>
+          )}
 
-            <AnimatePresence>
-              {modelDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-1.5 w-56 rounded-[10px] border border-[#262626] bg-[#141414] shadow-lg shadow-black/40 z-50 overflow-hidden"
-                >
-                  {MODEL_OPTIONS.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => {
-                        setSelectedModel(model)
-                        setModelDropdownOpen(false)
-                      }}
-                      className={`flex flex-col w-full px-3 py-2.5 text-left transition-colors ${
-                        selectedModel.id === model.id
-                          ? 'bg-[#7c3aed]/10'
-                          : 'hover:bg-[#1a1a1a]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Sparkles
-                          size={12}
-                          className={
-                            selectedModel.id === model.id
-                              ? 'text-[#7c3aed]'
-                              : 'text-[#525252]'
-                          }
-                        />
-                        <span
-                          className={`text-xs font-medium ${
-                            selectedModel.id === model.id
-                              ? 'text-[#f5f5f5]'
-                              : 'text-[#a3a3a3]'
-                          }`}
-                        >
-                          {model.label}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-[#525252] ml-5">
-                        {model.desc}
-                      </span>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Conversation title — dynamic, only in chat */}
+          {chatId && (
+            <span className="text-sm text-[var(--text-secondary)] truncate select-none">
+              {chatTitle || 'Новый чат'}
+            </span>
+          )}
         </div>
 
         {/* Page content */}

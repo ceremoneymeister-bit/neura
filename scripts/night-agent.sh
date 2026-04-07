@@ -9,7 +9,7 @@ mkdir -p $LOG_DIR
 
 PROMPT="Ты — ночной автономный агент. Дмитрий спит. Работай самостоятельно и тщательно.
 
-ЗАДАЧА: Прочитай /root/Antigravity/NIGHT_TASKS.md → выполни задачу $TASK_NUM ('$DESC').
+ЗАДАЧА: Прочитай ${NEURA_BASE:-/opt/neura-v2}/NIGHT_TASKS.md → выполни задачу $TASK_NUM ('$DESC').
 
 КРИТИЧЕСКИЕ ПРАВИЛА:
 - ⛔ НЕ перезапускать neura-v2.service — 6 ботов работают! Только СОЗДАВАЙ файлы, не трогай запущенный процесс
@@ -20,12 +20,12 @@ PROMPT="Ты — ночной автономный агент. Дмитрий с
 - ✅ Перед написанием кода — прочитай существующий код в /opt/neura-v2/
 - ✅ Если файл от предыдущего агента ещё не создан — создай заглушку и продолжай
 - ✅ Будь ПРОАКТИВНЫМ: находи лучшие решения, добавляй полезные фичи
-- ✅ После завершения отправь отчёт: python3 /root/Antigravity/scripts/tg-send-hq.py 962 'краткий отчёт что сделано'
+- ✅ После завершения отправь отчёт: python3 ${NEURA_BASE:-/opt/neura-v2}/scripts/tg-send-hq.py 962 'краткий отчёт что сделано'
 
 КОНТЕКСТ: Neura v2 — платформа AI-агентов. 6 ботов в одном процессе, PostgreSQL + Redis, FastAPI backend + React frontend. Всё в /opt/neura-v2/."
 
 # Cron Guardian gate
-python3 /root/Antigravity/.agent/skills/cron-guardian/guardian.py gate || exit 1
+python3 ${NEURA_BASE:-/opt/neura-v2}/.agent/skills/cron-guardian/guardian.py gate || exit 1
 
 cd /opt/neura-v2 && claude -p "$PROMPT" \
   --model sonnet \
@@ -34,4 +34,4 @@ cd /opt/neura-v2 && claude -p "$PROMPT" \
   > "$LOG_DIR/night-agent-${TASK_NUM}.log" 2>&1
 
 # Log to guardian
-python3 /root/Antigravity/.agent/skills/cron-guardian/guardian.py log "night-web-${TASK_NUM}"
+python3 ${NEURA_BASE:-/opt/neura-v2}/.agent/skills/cron-guardian/guardian.py log "night-web-${TASK_NUM}"

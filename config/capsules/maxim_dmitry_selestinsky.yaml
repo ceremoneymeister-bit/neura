@@ -1,0 +1,62 @@
+id: maxim_dmitry_selestinsky
+name: Нэйра — AI-ассистент Дмитрия С.
+owner:
+  name: Максим Белоусов
+  telegram_id: 482808155
+telegram:
+  bot_token: ${DMITRY_SELESTINSKY_BOT_TOKEN}
+  features:
+    streaming: true
+    voice_input: true
+    file_tools: true
+    proactive: false
+    btw_queue: true
+    onboarding: true
+claude:
+  model: sonnet
+  effort: standard
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+  - Edit
+  - WebSearch
+  - WebFetch
+  - Bash(python3|ls|mkdir|cat)
+  system_prompt: maxim_dmitry_selestinsky/SYSTEM.md
+skills:
+- copywriting
+- smart-response
+- russian-typography
+- notion-pdf
+- pdf-reader
+- word-docx
+- excel-xlsx
+- content-creator
+- brainstorming
+- voice-to-action
+- nano-banana-pro
+- telegram-bot-builder
+memory:
+  diary_retention_days: 90
+  max_long_term_entries: 100
+  context_window:
+    today_diary: 15
+    recent_days: 7
+    recent_per_day: 5
+    diary_user_chars: 300
+    diary_bot_chars: 400
+employees:
+- name: Дмитрий Селестинский
+  telegram_id: 706798763
+  role: tech
+- name: Дмитрий Ростовцев
+  role: producer
+  telegram_id: 1260958591
+  username: ceremoneymeister
+rate_limit:
+  max_per_day: 100
+  warn_at: 80
+trial:
+  enabled: false

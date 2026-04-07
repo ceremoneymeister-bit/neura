@@ -9,6 +9,14 @@ category: communication
 tags: [telegram, userbot, dm, personal-message, telethon]
 risk: medium
 source: internal
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "явная просьба Дмитрия"
+proactive_trigger_1_action: "отправить сообщение от его имени"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # dm-sender — Отправка личных сообщений от имени Дмитрия
@@ -190,3 +198,9 @@ python3 scripts/tg-send.py victoria "[FILE:/tmp/doc.pdf] Подпись"
 - **ВСЕГДА** используй `python3 scripts/tg-send.py` — НЕ пиши Telethon-код вручную
 - Алиасы и fallback встроены в скрипт, не нужно помнить username/ID
 - Если скрипт не работает — проблема в авторизации сессии, сообщи Дмитрию
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

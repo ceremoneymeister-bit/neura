@@ -12,6 +12,14 @@ source: internal
 usage_count: 1
 last_used: 2026-04-01
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "пятница"
+proactive_trigger_1_action: "предложить сценарий рилса для Нейры"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # neura-reels
@@ -421,3 +429,9 @@ Output the final script with:
 - `references/sound-and-energy.md` — Energy curves, sound design, WPS validation
 - `references/platform-rules.md` — Instagram/TikTok/YouTube rules, hashtags, covers
 - `references/ideas-bank.md` — Raw ideas for future scripts
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -1,6 +1,14 @@
 ---
 name: market-research
 description: "Use when researching markets, evaluating niches, analyzing competitors, sizing opportunities — 'исследуй рынок', 'оцени нишу', 'конкуренты', TAM/SAM/SOM, валидация спроса, 'стоит ли входить'"
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новая ниша/продукт"
+proactive_trigger_1_action: "исследование TAM/SAM/SOM и конкурентов"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Market Research — исследование рынка
@@ -201,3 +209,26 @@ description: "Use when researching markets, evaluating niches, analyzing competi
 2.
 3.
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 12 использований, success rate 100.0%, avg latency 46.4s
+- 2026-04-07: 11 использований, success rate 100.0%, avg latency 49.2s
+- 2026-04-07: 10 использований, success rate 100.0%, avg latency 52.0s
+- 2026-04-07: 9 использований, success rate 100.0%, avg latency 56.5s
+- 2026-04-07: 8 использований, success rate 100.0%, avg latency 52.1s
+- 2026-04-06: 7 использований, success rate 100.0%, avg latency 53.0s
+- 2026-04-06: 6 использований, success rate 100.0%, avg latency 45.5s
+- 2026-04-06: 5 использований, success rate 100.0%, avg latency 52.8s

@@ -9,6 +9,14 @@ category: development
 tags: [design, visual, frontend, css, replication, screenshot, pixel-perfect]
 risk: safe
 source: internal
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "скриншот/макет для воспроизведения"
+proactive_trigger_1_action: "pixel-perfect реплика"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # visual-replication
@@ -216,3 +224,9 @@ python3 scripts/visual-analyzer.py <reference.png> /tmp/result.png --compare
 
 - `references/workflow-example.md` — Пример полного прохода от референса до готового кода
 - `references/calibration.md` — Калибровочные примеры для scoring
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

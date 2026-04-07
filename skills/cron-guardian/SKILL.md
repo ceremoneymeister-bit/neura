@@ -9,6 +9,17 @@ category: infrastructure
 tags: [cron, slots, limits, claude-cli, subscription, protection, registry, alerts]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: threshold
+proactive_trigger_1_condition: "свободных слотов < 3"
+proactive_trigger_1_action: "предупредить о лимите"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "добавление нового cron/таймера"
+proactive_trigger_2_action: "gate-check бюджета"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Cron Guardian + Slot Manager — управление кронами сервера
@@ -145,3 +156,9 @@ result = subprocess.run(
 | `data/cron-registry.json` | Реестр всех кронов (автогенерация) |
 | `data/claude_usage.jsonl` | Лог Claude CLI (append-only) |
 | `data/alerts_sent.json` | Дедупликация алертов |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

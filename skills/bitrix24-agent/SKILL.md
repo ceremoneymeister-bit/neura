@@ -1,6 +1,14 @@
 ---
 name: bitrix24-agent
 description: Design, implement, debug, and harden integrations between AI agents and Bitrix24 REST API (webhooks, OAuth 2.0, scopes, events, batch, limits, and REST 3.0). Use when asked to connect AI assistants/agents to Bitrix24, automate CRM/tasks/chats, process Bitrix24 events, choose an auth model, or resolve Bitrix24 API errors and performance issues.
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "клиент использует Битрикс24"
+proactive_trigger_1_action: "предложить интеграцию CRM"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Bitrix24 Agent (Lean + Reliable)
@@ -199,3 +207,28 @@ rg -n "offline|event\\.bind|event\\.offline|application_token" references/bitrix
 
 - `scripts/bitrix24_client.py`: method calls, packs, allowlist, confirmations, plans, idempotency, audit, rate limiting, retries.
 - `scripts/offline_sync_worker.py`: offline queue polling, bounded retries, DLQ handling, safe clear flow, graceful shutdown.
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+- 2026-04-06: 13 использований, success rate 100.0%, avg latency 34.1s
+- 2026-04-06: 12 использований, success rate 100.0%, avg latency 36.1s
+- 2026-04-06: 11 использований, success rate 100.0%, avg latency 38.6s
+- 2026-04-06: 10 использований, success rate 100.0%, avg latency 40.7s
+- 2026-04-06: 9 использований, success rate 100.0%, avg latency 43.3s
+- 2026-04-06: 8 использований, success rate 100.0%, avg latency 45.9s
+- 2026-04-06: 7 использований, success rate 100.0%, avg latency 50.1s
+- 2026-04-06: 6 использований, success rate 100.0%, avg latency 53.1s
+- 2026-04-06: 5 использований, success rate 100.0%, avg latency 29.4s

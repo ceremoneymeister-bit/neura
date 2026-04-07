@@ -1,0 +1,7 @@
+# capsule_id → theme_id mapping
+# If capsule_id not listed, "default" theme is used
+
+maxim_belousov: neyra
+maxim_tatyana_smyk: neyra
+maxim_dmitry_selestinsky: neyra
+sergey_savchuk: neyra

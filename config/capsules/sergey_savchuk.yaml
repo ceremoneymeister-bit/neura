@@ -1,0 +1,75 @@
+id: sergey_savchuk
+name: Нэйра — AI-ассистент
+owner:
+  name: Сергей Савчук
+  telegram_id: 5141287871
+telegram:
+  bot_token: ${SERGEY_BOT_TOKEN}
+  features:
+    streaming: true
+    voice_input: true
+    file_tools: true
+    proactive: false
+    btw_queue: true
+    onboarding: true
+claude:
+  model: sonnet
+  effort: standard
+  allowed_tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+  - Edit
+  - WebSearch
+  - WebFetch
+  - Bash(python3|ls|mkdir|cat)
+  system_prompt: sergey_savchuk/SYSTEM.md
+skills:
+- copywriting
+- smart-response
+- russian-typography
+- notion-pdf
+- pdf-reader
+- word-docx
+- excel-xlsx
+- content-creator
+- brainstorming
+- product-catalog
+- voice-to-action
+- nano-banana-pro
+- image-processing
+- market-research
+- landing-page
+- seo-audit
+- social-content
+- carousel-creator
+- headline-lab
+- decision-lab
+- booking-scheduler
+- ppt-generator
+- cross-poster
+memory:
+  diary_retention_days: 90
+  max_long_term_entries: 100
+  context_window:
+    today_diary: 20
+    recent_days: 30
+    recent_per_day: 5
+    diary_user_chars: 300
+    diary_bot_chars: 400
+employees:
+- name: Дмитрий Ростовцев
+  role: producer
+  telegram_id: 1260958591
+  username: ceremoneymeister
+rate_limit:
+  max_per_day: 200
+  warn_at: 160
+trial:
+  enabled: false
+subscription:
+  plan: monthly
+  price_rub: 20000
+  start_date: "2026-04-07"
+  end_date: "2026-05-07"

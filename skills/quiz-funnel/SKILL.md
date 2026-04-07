@@ -12,6 +12,14 @@ source: internal
 triggers: [квиз, опросник, тест на сайте, квалификация лидов, quiz, калькулятор, сегментация заявок]
 usage_count: 0
 maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужна квалификация лидов"
+proactive_trigger_1_action: "предложить квиз-воронку"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # quiz-funnel
@@ -252,3 +260,9 @@ maturity: seed
 
 - **НЕЧ20 / ConversionArt** — Иван Дербилов, kvizy-2.0 (полный юнит по квизам)
 - Транскрипция: `projects/Producing/knowledge_base/transcriptions/НЕЧ20/База маркетинга/Квиз/kvizy-2.0.md`
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

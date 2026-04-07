@@ -81,6 +81,22 @@
     "trial": {"enabled": true, "days": 5},
     "capabilities": ["telegraph", "pdf", "onboarding", "trial", "skills_autodiscovery"]
   },
+  "anastasia_velikaya": {
+    "name": "Anastasia Velikaya",
+    "service": "neura-v2",
+    "transport": "neura-v2",
+    "bot_username": "anastasia_velikaya_ai_bot",
+    "bot_id": 8041958059,
+    "bot_token": "$ENV:ANASTASIA_VELIKAYA_BOT_TOKEN",
+    "hq_group_id": null,
+    "test_topic_id": null,
+    "code_dir": "/opt/neura-v2/",
+    "diary_dir": "/opt/neura-v2/homes/maxim_anastasia_velikaya/memory/diary/",
+    "memory_dir": "/opt/neura-v2/homes/maxim_anastasia_velikaya/memory/",
+    "log_cmd": "journalctl -u neura-v2 --since '{since}' --no-pager -q",
+    "trial": {"enabled": true, "days": 7},
+    "capabilities": ["telegraph", "pdf", "onboarding", "trial", "skills_autodiscovery"]
+  },
   "maxim": {
     "name": "Maxim Belousov",
     "service": "maxim-agent",
@@ -98,5 +114,20 @@
     "memory_dir": "projects/Producing/Maxim_Belousov/agent-system/data/memory/",
     "log_cmd": "journalctl -u maxim-agent --since '{since}' --no-pager -q",
     "capabilities": ["vk", "tts", "image_gen", "telegraph", "pdf", "markers", "execute_always_deep", "allowedTools"]
+  },
+  "rodion": {
+    "name": "Родион Радкевич",
+    "service": "neura-v2",
+    "transport": "neura-v2",
+    "bot_username": "rodion_radkevich_ai_bot",
+    "bot_id": 8693346122,
+    "bot_token": "$ENV:RODION_RADKEVICH_BOT_TOKEN",
+    "hq_group_id": null,
+    "test_topic_id": null,
+    "code_dir": "/opt/neura-v2/",
+    "diary_dir": "/opt/neura-v2/homes/rodion_radkevich/memory/diary/",
+    "memory_dir": "/opt/neura-v2/homes/rodion_radkevich/memory/",
+    "log_cmd": "journalctl -u neura-v2 --since '{since}' --no-pager -q",
+    "capabilities": ["telegraph", "pdf", "onboarding", "skills_autodiscovery"]
   }
 }

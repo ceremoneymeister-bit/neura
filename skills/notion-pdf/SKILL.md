@@ -9,6 +9,14 @@ category: infrastructure
 tags: [pdf, notion, document, export, markdown, universal]
 risk: safe
 source: internal
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужен PDF/документ"
+proactive_trigger_1_action: "сгенерировать через python-docx/reportlab"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # notion-pdf
@@ -199,3 +207,68 @@ COPY .agent/skills/notion-pdf/scripts/md2pdf.py /app/skills/md2pdf.py
 - Markdown-таблицы корректно конвертируются через `markdown` библиотеку с расширением `tables`
 - Для объединения нескольких файлов page-break через CSS `page-break-before: always` работает
 - Размер PDF: ~10-12 KB на страницу текста, таблицы увеличивают на ~2-3 KB
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- 2026-04-07: 33 использований, success rate 100.0%, avg latency 51.7s
+- 2026-04-07: 32 использований, success rate 100.0%, avg latency 51.7s
+- 2026-04-07: 31 использований, success rate 100.0%, avg latency 52.8s
+- 2026-04-07: 30 использований, success rate 100.0%, avg latency 54.1s
+- 2026-04-07: 29 использований, success rate 100.0%, avg latency 55.5s
+- 2026-04-06: 28 использований, success rate 100.0%, avg latency 56.6s
+- 2026-04-06: 27 использований, success rate 100.0%, avg latency 55.3s
+- 2026-04-06: 26 использований, success rate 100.0%, avg latency 54.7s
+- 2026-04-06: 25 использований, success rate 100.0%, avg latency 50.6s
+- 2026-04-06: 24 использований, success rate 100.0%, avg latency 49.2s
+- 2026-04-06: 23 использований, success rate 100.0%, avg latency 50.2s
+- 2026-04-06: 22 использований, success rate 100.0%, avg latency 51.5s
+- 2026-04-06: 21 использований, success rate 100.0%, avg latency 53.1s
+- 2026-04-06: 20 использований, success rate 100.0%, avg latency 49.2s
+- 2026-04-06: 19 использований, success rate 100.0%, avg latency 43.3s
+- 2026-04-06: 18 использований, success rate 100.0%, avg latency 45.4s
+- 2026-04-06: 17 использований, success rate 100.0%, avg latency 46.5s
+- 2026-04-05: 16 использований, success rate 100.0%, avg latency 43.2s
+- 2026-04-05: 15 использований, success rate 100.0%, avg latency 44.1s
+- 2026-04-05: 14 использований, success rate 100.0%, avg latency 44.6s
+- 2026-04-05: 13 использований, success rate 100.0%, avg latency 46.5s
+- 2026-04-05: 12 использований, success rate 100.0%, avg latency 36.0s
+- 2026-04-05: 11 использований, success rate 100.0%, avg latency 37.4s
+- 2026-04-05: 10 использований, success rate 100.0%, avg latency 39.1s
+- 2026-04-05: 9 использований, success rate 100.0%, avg latency 42.6s
+- 2026-04-04: 8 использований, success rate 100.0%, avg latency 42.8s
+- 2026-04-04: 7 использований, success rate 100.0%, avg latency 45.3s
+- 2026-04-04: 6 использований, success rate 100.0%, avg latency 48.5s
+- 2026-04-04: 5 использований, success rate 100.0%, avg latency 51.0s

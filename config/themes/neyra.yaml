@@ -1,0 +1,30 @@
+id: neyra
+name: Нэйра
+logo_text: Нэйра
+accent: "#0ea5e9"  # sky-500
+accent_hover: "#0284c7"  # sky-600
+accent_muted: "rgba(14, 165, 233, 0.15)"
+accent_light: "#38bdf8"  # sky-400
+accent_gradient: "linear-gradient(135deg, #0ea5e9, #38bdf8)"
+accent_glow: "0 0 20px rgba(14, 165, 233, 0.3)"
+brand_clay: "#f97316"  # orange for contrast
+dark:
+  bg_primary: "#0f172a"  # slate-900
+  bg_sidebar: "#1e293b"  # slate-800
+  bg_card: "#0f172a"
+  bg_input: "#1e293b"
+  bg_hover: "#334155"  # slate-700
+  text_primary: "#f1f5f9"  # slate-100
+  text_secondary: "#94a3b8"  # slate-400
+  text_muted: "#64748b"  # slate-500
+  border: "rgba(148, 163, 184, 0.1)"
+light:
+  bg_primary: "#f8fafc"  # slate-50
+  bg_sidebar: "#e2e8f0"  # slate-200
+  bg_card: "#ffffff"
+  bg_input: "#ffffff"
+  bg_hover: "#e2e8f0"
+  text_primary: "#0f172a"
+  text_secondary: "#475569"
+  text_muted: "#94a3b8"
+  border: "rgba(0, 0, 0, 0.06)"

@@ -14,8 +14,13 @@ from fastapi import Request, HTTPException, status
 
 logger = logging.getLogger(__name__)
 
-# Secret key — read from env, fallback for tests only
-JWT_SECRET = os.environ.get("JWT_SECRET", "neura-web-secret-change-in-production")
+# Secret key — MUST be set in env for production
+_jwt_secret_env = os.environ.get("JWT_SECRET", "")
+if not _jwt_secret_env:
+    import secrets
+    _jwt_secret_env = secrets.token_hex(32)
+    logger.warning("JWT_SECRET not set in env — generated random key (sessions won't survive restart!)")
+JWT_SECRET = _jwt_secret_env
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
 

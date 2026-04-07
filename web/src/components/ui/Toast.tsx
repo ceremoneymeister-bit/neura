@@ -51,13 +51,15 @@ function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: (id: string) => void
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.95 }}
       transition={{ duration: 0.15 }}
-      className="flex items-start gap-2.5 min-w-[260px] max-w-[360px] rounded-[8px] bg-[#1e1e1e] border border-[#262626] px-4 py-3 shadow-lg"
+      className="flex items-start gap-2.5 min-w-[260px] max-w-[360px] rounded-lg bg-[var(--bg-input)] border border-[var(--border)] px-4 py-3 shadow-lg"
     >
       {icons[t.type]}
-      <p className="flex-1 text-sm text-[#f5f5f5] leading-snug">{t.message}</p>
+      <p className="flex-1 text-sm text-[var(--text-primary)] leading-snug">{t.message}</p>
       <button
         onClick={() => onDismiss(t.id)}
-        className="text-[#525252] hover:text-[#f5f5f5] transition-colors shrink-0 mt-0.5"
+        aria-label="Закрыть"
+        title="Закрыть"
+        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0 mt-0.5"
       >
         <X size={13} />
       </button>

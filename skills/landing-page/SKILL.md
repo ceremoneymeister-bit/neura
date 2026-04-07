@@ -6,6 +6,14 @@ category: dev
 tags: [landing-page, conversion, copywriting, design, seo, react, tailwind]
 risk: safe
 source: internal
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "нужен лендинг/промо-страница"
+proactive_trigger_1_action: "запустить workflow создания"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Landing Page — Unified Creation Workflow
@@ -412,3 +420,9 @@ Hero → Social Proof → Pain/Problem → Solution → Benefits → How It Work
 Полный список (20 типов) — в рабочей тетради НЕЧ20.
 
 Детальные фреймворки → `references/`
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

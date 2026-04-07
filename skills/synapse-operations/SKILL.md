@@ -1,6 +1,14 @@
 ---
 name: synapse-operations
 description: "Операционное управление школой {{SCHOOL_NAME}}: чеклисты запуска, помещения, оборудование, юридика, финансы. 'Как запустить школу', 'чеклист', 'помещение', 'договор', 'финансовая модель'."
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "понедельник"
+proactive_trigger_1_action: "операционный чеклист школы"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Операционное управление {{SCHOOL_NAME}}
@@ -37,3 +45,9 @@ description: "Операционное управление школой {{SCHOO
 - **Влад Коренда** (@VladiFame99) — основной исполнитель операционки
 - **Дмитрий** — ревью и стратегические решения
 - **Анастасия** — обратная связь по помещению и оборудованию
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

@@ -1,5 +1,11 @@
 """Per-capsule request queue — processing lock, BTW batching, rate limits.
 
+@arch scope=platform  affects=all_capsules(14)
+@arch depends=redis (async)
+@arch risk=HIGH  restart=neura-v2
+@arch role=Concurrency control. Processing lock per capsule, BTW queue per user_id.
+@arch note=Lock TTL=5min safety. BTW queue TTL=1h. Per-user to prevent cross-contamination.
+
 All state in Redis. One capsule processes one request at a time.
 Messages arriving during processing are queued (BTW pattern)
 and flushed as additional context for the next response.
@@ -38,26 +44,99 @@ class RequestQueue:
         val = await self._r.get(f"{KEY_PREFIX}:processing:{capsule_id}")
         return val is not None
 
-    async def set_processing(self, capsule_id: str, active: bool) -> None:
-        """Set or clear processing flag."""
+    async def get_processing_user(self, capsule_id: str) -> int | None:
+        """Return user_id of who's currently processing, or None."""
+        val = await self._r.get(f"{KEY_PREFIX}:processing:{capsule_id}")
+        if val is None:
+            return None
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return -1  # legacy "1" value
+
+    async def set_processing(self, capsule_id: str, active: bool,
+                             user_id: int = 0) -> None:
+        """Set or clear processing flag. Stores user_id for multi-employee."""
         key = f"{KEY_PREFIX}:processing:{capsule_id}"
         if active:
-            await self._r.set(key, "1", ex=600)  # 10 min safety TTL
+            await self._r.set(key, str(user_id), ex=300)  # 5 min safety TTL
         else:
             await self._r.delete(key)
 
-    # === BTW queue ===
+    async def cancel_processing(self, capsule_id: str) -> bool:
+        """Cancel current processing for a capsule.
 
-    async def add_btw(self, capsule_id: str, message: QueuedMessage) -> int:
-        """Add a message to BTW queue. Returns queue length."""
-        key = f"{KEY_PREFIX}:btw:{capsule_id}"
+        Sets a cancel flag that the engine loop can check.
+        Returns True if there was an active processing to cancel.
+        """
+        key = f"{KEY_PREFIX}:processing:{capsule_id}"
+        was_active = await self._r.exists(key)
+        if was_active:
+            # Set cancel flag (checked by transport layer)
+            await self._r.set(
+                f"{KEY_PREFIX}:cancel:{capsule_id}", "1", ex=60
+            )
+            # Clear the processing lock
+            await self._r.delete(key)
+            logger.info(f"Processing cancelled for {capsule_id}")
+        return bool(was_active)
+
+    async def is_cancelled(self, capsule_id: str) -> bool:
+        """Check if processing was cancelled. Consumes the flag."""
+        key = f"{KEY_PREFIX}:cancel:{capsule_id}"
+        val = await self._r.getdel(key)
+        return val is not None
+
+    async def get_processing_age(self, capsule_id: str) -> float | None:
+        """Get how long the current processing has been running (seconds).
+
+        Returns None if not processing. Uses Redis TTL to calculate.
+        """
+        key = f"{KEY_PREFIX}:processing:{capsule_id}"
+        ttl = await self._r.ttl(key)
+        if ttl < 0:
+            return None
+        # Processing lock was set with ex=300 (5 min)
+        return 300 - ttl
+
+    async def clear_all_processing_locks(self) -> int:
+        """Clear all stale processing locks on startup. Returns count cleared."""
+        keys = []
+        async for key in self._r.scan_iter(f"{KEY_PREFIX}:processing:*"):
+            keys.append(key)
+        for key in keys:
+            await self._r.delete(key)
+        # Also clear any stale cancel flags
+        cancel_keys = []
+        async for key in self._r.scan_iter(f"{KEY_PREFIX}:cancel:*"):
+            cancel_keys.append(key)
+        for key in cancel_keys:
+            await self._r.delete(key)
+        return len(keys)
+
+    # === BTW queue (per capsule+user to prevent cross-contamination) ===
+
+    async def add_btw(self, capsule_id: str, message: QueuedMessage,
+                      user_id: int = 0, max_size: int = 10) -> int:
+        """Add a message to per-user BTW queue. Returns queue length.
+
+        Enforces max_size (drops oldest) and 1h TTL to prevent unbounded growth.
+        """
+        key = f"{KEY_PREFIX}:btw:{capsule_id}:{user_id}"
         data = json.dumps(asdict(message))
         result = await self._r.rpush(key, data)  # type: ignore[misc]
-        return int(result)
+        queue_len = int(result)
+        # Enforce max size — drop oldest
+        if queue_len > max_size:
+            await self._r.ltrim(key, queue_len - max_size, -1)
+            queue_len = max_size
+        # Set TTL so stale queues auto-expire
+        await self._r.expire(key, 3600)  # 1 hour
+        return queue_len
 
-    async def flush_btw(self, capsule_id: str) -> list[QueuedMessage]:
-        """Get all BTW messages and clear the queue atomically."""
-        key = f"{KEY_PREFIX}:btw:{capsule_id}"
+    async def flush_btw(self, capsule_id: str, user_id: int = 0) -> list[QueuedMessage]:
+        """Get all BTW messages for a specific user and clear atomically."""
+        key = f"{KEY_PREFIX}:btw:{capsule_id}:{user_id}"
         # Atomic: get + delete in pipeline
         async with self._r.pipeline(transaction=True) as pipe:
             pipe.lrange(key, 0, -1)

@@ -36,7 +36,10 @@ class Database:
             if not dsn:
                 raise ValueError("No DSN provided and DATABASE_URL not set")
 
-        self._pool = await asyncpg.create_pool(dsn, min_size=2, max_size=10)
+        self._pool = await asyncpg.create_pool(
+            dsn, min_size=2, max_size=10,
+            server_settings={"statement_timeout": "30000"},  # 30s instead of default 300s
+        )
         logger.info("Database connected")
 
     async def disconnect(self) -> None:

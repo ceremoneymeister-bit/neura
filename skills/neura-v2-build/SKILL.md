@@ -8,6 +8,16 @@ category: meta
 tags: [architecture, build, workflow, tdd, verification]
 risk: high
 maturity: seed
+usage_count: 2
+last_used: 2026-04-02
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "работа над Neura v2 модулем"
+proactive_trigger_1_action: "6 Gates TDD workflow"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Neura v2 Build Workflow
@@ -307,6 +317,62 @@ maturity: seed
 | 6 | Писать >300 строк за раз | Необозримый diff | Разбить на подмодули |
 | 7 | Редактировать v1 при работе v2 | Сломать текущих клиентов | Изолированная директория |
 | 8 | Начать без /plan | Не понял задачу | ВСЕГДА /plan сначала |
+| 9 | Smoke test = "всё работает" | 4 gap найдены после 60/60 smoke | Feature Audit после КАЖДОЙ фазы |
+| 10 | nohup вместо systemd | Не переживёт reboot | .service + enable СРАЗУ |
+| 11 | Hardcoded пути (/root/Antigravity/) | Не портативно | ${NEURA_BASE} + env vars |
+| 12 | FK insert без проверки parent | migrate_data.py crash | Сначала INSERT parent, потом child |
+| 13 | Migrate без cwd fix | Claude не видит assets | cwd=home_dir в engine.py |
+| 14 | Standalone web.py на отдельном порту | Два процесса, сложнее управлять | Интегрировать в app.py через uvicorn.Server + asyncio.create_task |
+| 15 | VITE_API_URL с абсолютным URL | Ломается при смене домена | Пустой VITE_API_URL → relative paths (клиент на том же домене) |
+| 16 | UI без Agent Teams | Один агент = последовательно, долго | 2+ UI-агента на разные файлы (layout vs components) параллельно |
+| 17 | Перехват только в _handle_text | Voice/photo/doc обходят онбординг | Онбординг-intercept во ВСЕХ handler'ах (text+voice+photo+doc) |
+| 18 | StringSession для Telethon auth | TCP disconnect → auth_key теряется → PhoneCodeExpired | Файловая сессия (SQLite) — auth_key переживает reconnect |
+| 19 | Не удалять stale .session перед retry | Старый auth_key конфликтует с новым send_code | _delete_stale_session() ПЕРЕД каждой новой попыткой |
+| 20 | Phone code как единственный метод auth | Rate limit 5/day, TCP disconnect | QR Login (primary) + Phone Code (fallback) |
+| 21 | Diary truncation 500 символов | Бот "не помнит" длинные сообщения | Минимум 2000 символов для user_message и bot_response |
+| 22 | Phase 6 как gate (не auto-complete) | Пользователь застревает в resume loop | Phase 6 = авто-complete при показе, кнопка для UX |
+
+---
+
+## Post-Migration Checklist (ОБЯЗАТЕЛЬНО после каждой миграции/фазы)
+
+> Урок 01.04.2026: после Phase 2 (миграция капсул) smoke test прошёл 60/60,
+> но 4 критических gap обнаружились только при аудите функциональной полноты.
+
+### Smoke test ≠ Feature completeness
+
+Smoke test проверяет: "пайплайн работает" (capsule loads → engine responds).
+Feature completeness проверяет: "пользователь может делать ВСЁ что мог раньше".
+
+**После КАЖДОЙ миграции/фазы — запусти Feature Audit:**
+
+```
+1. Working directory: cwd=home_dir в subprocess? Claude может читать локальные файлы?
+2. Assets: knowledge/, employees/, data/, skills/ скопированы в новое расположение?
+3. Skills injection: скиллы из YAML конфига попадают в промпт Claude?
+4. Employee context: для мульти-user ботов — досье грузится per-user?
+5. File markers: [FILE:/tmp/path] → файл отправляется?
+6. Telegraph: длинные ответы > 4000 → Telegraph page?
+7. Voice: транскрибация работает?
+8. Persistence: systemd service создан + enabled? old services disabled?
+9. Портативность: все пути через env/config, не hardcoded?
+10. Мониторинг: health checks + алерты настроены?
+```
+
+### systemd — создавай СРАЗУ
+
+| ❌ Как было | ✅ Как надо |
+|-------------|-----------|
+| Запустить через nohup, потом на аудите обнаружить | Сразу создать .service + enable |
+| v1 services остаются enabled | `systemctl disable` всех v1 сервисов |
+
+### Портативность — по умолчанию
+
+Все пути через:
+- `${NEURA_BASE}` в SYSTEM.md (подставляется в capsule.py)
+- `NEURA_SKILLS_DIR` env var (default: `./skills/`)
+- `NEURA_HOMES_DIR` env var (default: `./homes/`)
+- Относительные пути в engine.py (`cwd=home_dir`)
 
 ---
 
@@ -366,3 +432,30 @@ Claude:
 [Gate 5] [Показываю Дмитрию отчёт]
 [Gate 6] git commit + PROGRESS.md обновлён
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+### 2026-04-01 — создание скилла + Phase 0 (9 модулей, 98 тестов)
+- 6 Gates workflow: spec→TDD→implement→verify→review→commit. 3 хук-скрипта
+- Phase 0: 9 модулей за 1 сессию (engine 268 LOC, capsule 192, context 105, memory 195, db 68, cache+queue, skills 106, migrate_data 185)
+- Deep verify нашёл баги в 3 модулях: memory (DATE/TIME types), cache (3 бага), skills (pipe escaping)
+- CRITICAL: v1 enabled одновременно с v2 → конфликт. neura-v2.service создан
+- Урок: Gate 4 (deep verification) ловит баги, которые unit-тесты пропускают. Explore agent должен проверять spec vs код vs arch
+- Тайминг: ~200 LOC модуль + 6 Gates = ~30 мин (бенчмарк)
+
+### 2026-04-02 — Phase 1-5 + миграция + 12 антипаттернов
+- Phase 1 (Telegram): 66 тестов, 803 LOC. Phase 3 (Web): 3 параллельных агента, 227 тестов
+- Phase 5 (Deploy): uvicorn+Telegram одним процессом, LibreChat остановлен
+- Migration: 507 diary + 102 memory + 60 learnings → PostgreSQL
+- Feature Audit нашёл 4 critical gap (cwd, assets, skills injection, employee context)
+- Антипаттерн: nohup вместо systemd — не переживёт reboot. Создавать .service СРАЗУ
+- Антипаттерн: hardcoded пути — использовать ${NEURA_BASE} + env vars
+- Антипаттерн: standalone web.py на порту — интегрировать в app.py через uvicorn.Server
+- Антипаттерн: StringSession для Telethon → auth_key теряется. Файловая сессия (SQLite)
+- Антипаттерн: diary truncation 500 символов → бот "не помнит". Минимум 2000
+- Урок: Smoke test ≠ Feature completeness. Feature Audit ОБЯЗАТЕЛЕН после каждой фазы
+- Урок: Agent Teams (3-5) ускоряют Web UI кратно, но каждый агент ОБЯЗАН пройти Gates 2-4

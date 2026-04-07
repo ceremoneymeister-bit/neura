@@ -1,6 +1,14 @@
 ---
 name: pdf-generator
 description: "Генерация премиальных PDF — КП, отчёты, презентации, сертификаты. WeasyPrint + HTML/CSS. Красивый дизайн, кириллица, градиенты."
+proactive_enabled: false
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "явный запрос пользователя"
+proactive_trigger_1_action: "активировать скилл"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # PDF Generator — премиальные документы
@@ -502,3 +510,9 @@ pip install weasyprint
 - WeasyPrint требует system deps (cairo, pango) — включать в Dockerfile
 - Агент в Docker сам установит `pip install weasyprint` при первом вызове, но system deps нужны заранее
 - `/root/.claude` должен быть writable (не `:ro`), иначе Claude CLI не может сохранять permissions
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

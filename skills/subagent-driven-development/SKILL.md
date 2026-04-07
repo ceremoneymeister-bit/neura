@@ -1,6 +1,14 @@
 ---
 name: subagent-driven-development
 description: Use when executing implementation plans with independent tasks in the current session
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "задача с 3+ независимыми подзадачами"
+proactive_trigger_1_action: "параллельная реализация через субагентов"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Subagent-Driven Development
@@ -240,3 +248,9 @@ Done!
 
 **Alternative workflow:**
 - **superpowers:executing-plans** - Use for parallel session instead of same-session execution
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

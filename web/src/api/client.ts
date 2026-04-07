@@ -68,7 +68,7 @@ export const api = {
 /**
  * Upload a file using multipart/form-data. Returns { path, filename, size }.
  */
-export async function uploadFile(file: File): Promise<{ path: string; filename: string; size: number }> {
+export async function uploadFile(file: File, signal?: AbortSignal): Promise<{ path: string; filename: string; size: number }> {
   const form = new FormData()
   form.append('file', file)
 
@@ -80,6 +80,7 @@ export async function uploadFile(file: File): Promise<{ path: string; filename: 
     method: 'POST',
     headers,
     body: form,
+    signal,
   })
 
   if (!res.ok) {

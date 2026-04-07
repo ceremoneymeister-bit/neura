@@ -7,6 +7,17 @@ tags: [google, oauth, sheets, drive, calendar, gmail, integration]
 usage_count: 0
 maturity: seed
 last_used: null
+proactive_enabled: true
+proactive_trigger_1_type: threshold
+proactive_trigger_1_condition: "401 ошибки в логах капсул"
+proactive_trigger_1_action: "проверить и обновить OAuth токены"
+proactive_trigger_2_type: schedule
+proactive_trigger_2_condition: "еженедельно"
+proactive_trigger_2_action: "проверить срок действия credentials"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Google OAuth Skill
@@ -150,3 +161,12 @@ app.add_handler(CommandHandler("connect_google", cmd_connect_google))
 token = google_oauth.get_access_token()
 # Использовать token в headers: Authorization: Bearer {token}
 ```
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->
+
+
+- 2026-04-07: 5 использований, success rate 100.0%, avg latency 39.6s

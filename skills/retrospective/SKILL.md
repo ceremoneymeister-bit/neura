@@ -1,6 +1,14 @@
 ---
 name: retrospective
 description: "Ретроспектива за период. Оглянуться назад, оценить решения, найти паттерны, извлечь уроки. Работает с navigator/log/ и navigator/DECISIONS.md."
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "последний день месяца"
+proactive_trigger_1_action: "ретроспектива: уроки и паттерны"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Retrospective — ретроспектива
@@ -53,3 +61,9 @@ description: "Ретроспектива за период. Оглянуться
 1. Добавь запись-итог в `navigator/log/YYYY-MM.md`
 2. Обнови "Результат" в решениях в `navigator/DECISIONS.md`
 3. Если нужно — предложи goals-review для обновления целей
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

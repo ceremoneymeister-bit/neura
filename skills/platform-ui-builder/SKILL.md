@@ -8,6 +8,14 @@ category: development
 tags: [ui, ux, platform, dashboard, saas, figma, design-system, react, tailwind, glassmorphism, proactive, self-learning]
 risk: safe
 source: crystallized
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "создание интерфейса платформы/дашборда"
+proactive_trigger_1_action: "активировать Figma MCP + shadcn workflow"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Platform UI Builder
@@ -748,3 +756,9 @@ npm run dev
 | figma:figma-generate-library | Design system → Figma |
 | russian-typography | Неразрывные пробелы в русских текстах |
 | seo-audit | SEO проверка после создания |
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

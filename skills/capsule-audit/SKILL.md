@@ -8,6 +8,20 @@ updated: 2026-03-20
 category: infrastructure
 tags: [testing, audit, bots, capsules, health-check, debugging]
 risk: medium
+usage_count: 1
+last_used: 2026-04-03
+maturity: seed
+proactive_enabled: true
+proactive_trigger_1_type: schedule
+proactive_trigger_1_condition: "ежедневно 21:00"
+proactive_trigger_1_action: "health check всех капсул"
+proactive_trigger_2_type: event
+proactive_trigger_2_condition: "после обновления бота"
+proactive_trigger_2_action: "запустить smoke-тест"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 3
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Capsule Audit — скилл тестирования и дебага ботов
@@ -154,6 +168,37 @@ python3 .agent/skills/capsule-audit/scripts/capsule-audit.py --capsule victoria 
 | Yulia | docker | docker logs + docker stats | Bot API |
 | Maxim | ssh | ssh + journalctl | Bot API |
 
+## Дополнительные проверки v2 (добавлены 03.04.2026)
+
+| ID | Проверка | Метод |
+|----|----------|-------|
+| V2-01 | Docker v1 zombie containers | `docker ps \| grep -iE "yulia\|victoria\|marina"` — если running = 409 Conflict |
+| V2-02 | V1 systemd таймеры живы | `systemctl list-timers --all \| grep -iE "victoria\|marina\|yana\|yulia"` |
+| V2-03 | SYSTEM.md содержит userbot section | `grep "Интеграции Telegram" config/capsules/*/SYSTEM.md` |
+| V2-04 | SYSTEM.md содержит Telethon code | `grep "Telethon" config/capsules/*/SYSTEM.md` |
+| V2-05 | Userbot session существует | `find homes/ -name "*.session"` — каждая активная капсула должна иметь |
+| V2-06 | API creds НЕ hardcoded | `grep "33869550" config/capsules/*/SYSTEM.md` — должно быть 0 |
+| V2-07 | Context window настроен | `grep "recent_days" config/capsules/*.yaml` — должно быть 7 для всех |
+| V2-08 | diary_bot_chars настроен | `grep "diary_bot_chars" config/capsules/*.yaml` — должно быть >=500 |
+| V2-09 | Согласование перед действиями | `grep "Согласование" config/capsules/*/SYSTEM.md` — должно быть в каждом |
+| V2-10 | PDF warning в SYSTEM.md | `grep "capsule-tools.py для PDF" config/capsules/*/SYSTEM.md` |
+| V2-11 | Onboarding не застрял | `python3 -c "import redis; r=redis.Redis(); print(list(r.scan_iter('neura:onb:*')))"` |
+| V2-12 | Prompt pipeline safe | engine.py: threshold 120KB, stdin pipe для >120KB, NO bash -c |
+
+## Чтение чатов пользователей (deep audit)
+
+Для глубокого аудита — читай РЕАЛЬНЫЕ сообщения через userbot:
+```python
+# Рабочие сессии:
+# Дмитрий (основной): /root/Antigravity/.secrets/telegram_userbot
+# Victoria: /opt/neura-v2/homes/victoria_sel/victoria_userbot.session
+# Yana: /opt/neura-v2/homes/yana_berezhnaya/yana_berezhnaya_userbot.session
+# Yulia: /opt/neura-v2/homes/yulia_gudymo/yulia_gudymo_userbot.session
+# Marina: EXPIRED — нужно переподключить
+```
+
+Deepgram транскрипция для голосовых: `scripts/tg-send.py` или прямой API call.
+
 ## Anti-patterns
 - ❌ НЕ использовать Telethon для тестовых сообщений (session lock!)
 - ❌ НЕ запускать Layer 1 тесты на Максима без явной просьбы (чужой сервер)
@@ -163,6 +208,9 @@ python3 .agent/skills/capsule-audit/scripts/capsule-audit.py --capsule victoria 
 - ❌ НЕ запускать полный аудит чаще раза в день (нагрузка на Claude API)
 - ❌ НЕ доверять score 100/100 если >50% тестов skipped — формула врёт
 - ❌ НЕ игнорировать мета-мусор (💾, SESSION_LOG, скилл-чек) в ответах бота — это признак утечки CLAUDE.md из родительской директории (инцидент 24.03.2026)
+- ❌ НЕ менять shared код (engine.py, telegram.py) без проверки влияния на ВСЕ капсулы (инцидент 03.04 — bash -c сломал Яну и Марину)
+- ❌ НЕ использовать bash -c с пользовательским текстом — shell escaping injection (инцидент 03.04)
+- ❌ НЕ снижать threshold/timeout без проверки что все промпты помещаются (инцидент 03.04 — 50KB threshold → Яна 46KB сломалась)
 
 ## Тесты изоляции (добавлены 24.03.2026)
 
@@ -265,3 +313,22 @@ Parser session (`telegram_userbot_parser`) может не иметь кэшир
 - **Портативность уже работает** (10/10), но без skills и tools капсула — пустая оболочка
 - **Тестирование через HQ-топик** — создать топик `🧪 Neura Etalon` и отправлять туда тестовые сообщения с inline keyboard для визуальной проверки
 - **Menu callbacks** — самая частая ошибка: `menu:open` и `menu:model` в кнопках ответа не обрабатывались в callbacks.py (мёртвые кнопки)
+
+---
+
+## Changelog
+
+### 2026-04-03 — Полный аудит neura-v2 (7 капсул, 50 находок)
+
+**Уроки:**
+1. **journalctl = чёрный ящик для Claude subprocess.** Telethon/userbot операции НЕ видны в `journalctl -u neura-v2`. Для поиска userbot активности → diary в PostgreSQL (`SELECT * FROM diary WHERE bot_response ILIKE '%userbot%'`)
+2. **Dashboard undercounts ошибки.** 15+ early return paths в telegram.py (auth, trial, rate limit) выходят ДО `_process_message()` → не попадают в метрики. Реальный error rate = запросы из diary, не из dashboard
+3. **v1 таймеры = источник CLAUDE.md утечки.** Victoria v1 proactive timers (content/fact/intention/reflect/tool) работают из `/root/Antigravity/` с родительским CLAUDE.md → мета-мусор в ответах. Фикс: `--append-system-prompt` в v1 скрипте
+4. **API credentials в SYSTEM.md** — были plaintext (API_ID, API_HASH). Заменены на `os.environ['TELETHON_API_ID']`. Claude адаптируется и подставляет из diary-контекста даже без env vars, но это ненадёжно
+5. **Добавить в чеклист:** проверка v1 таймеров (`systemctl list-units | grep -iE "victoria|marina|yana"`) как обязательный пункт аудита
+6. **Neura-v2 архитектура:** context.py всегда `is_first_message=True`, BTW queue без лимита, diary cleanup не в cron — найдены 50 архитектурных точек для проработки
+
+**Anti-patterns обнаруженные:**
+- ❌ НЕ грепать journalctl для поиска userbot-активности → смотреть diary в DB
+- ❌ НЕ доверять dashboard OK% → считать ошибки по diary + Stream done 0 chunks
+- ❌ НЕ менять WorkingDirectory в systemd если скрипт использует `Path(__file__)` для BASE

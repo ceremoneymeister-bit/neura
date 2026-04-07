@@ -15,10 +15,11 @@ PROTECTED_PATHS = [
 ]
 
 # Разрешённые пути (даже внутри protected)
+_BASE = os.environ.get("NEURA_BASE", "/opt/neura-v2")
 ALLOWED_PATTERNS = [
-    "/opt/neura-v2/",           # Новая платформа — всегда OK
-    "/root/Antigravity/docs/",  # Документация — всегда OK
-    "/root/Antigravity/.agent/", # Скиллы — всегда OK
+    f"{_BASE}/",                # Платформа — всегда OK
+    f"{_BASE}/docs/",           # Документация — всегда OK
+    f"{_BASE}/skills/",         # Скиллы — всегда OK
 ]
 
 def main():

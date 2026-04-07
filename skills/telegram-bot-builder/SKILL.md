@@ -7,6 +7,14 @@ tags: [telegram, bot, ai-agent, claude, capsule, premium]
 usage_count: 0
 maturity: seed
 last_used: null
+proactive_enabled: true
+proactive_trigger_1_type: event
+proactive_trigger_1_condition: "новый клиент подключен"
+proactive_trigger_1_action: "предложить создание бота по 9 фазам"
+learning_track_success: true
+learning_track_corrections: true
+learning_evolve_threshold: 5
+learning_auto_update: [anti-patterns, triggers, changelog]
 ---
 
 # Telegram Bot Builder — Premium AI-агенты
@@ -778,3 +786,9 @@ python3 scripts/grsai-image.py generate \
 - НЕ игнорировать буферизацию → 3 сообщения подряд = 1 запрос
 - НЕ отправлять >4000 символов в Telegram → Telegraph автоматически
 - НЕ ставить MemoryMax < 4G для ботов с Claude CLI subprocess
+
+---
+
+## Changelog
+
+<!-- Сюда автоматически добавляются уроки после каждого использования скилла -->

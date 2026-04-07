@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><style>
+@page { size: A4 landscape; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'DejaVu Sans', system-ui, sans-serif;
+    color: #1a1a2e; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, {{dark}} 0%, #1a1a3e 50%, {{dark}} 100%);
+}
+
+.cert {
+    width: 90%; max-width: 900px; background: white;
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+/* Gold border */
+.cert::before {
+    content: ""; position: absolute; inset: 8px;
+    border: 2px solid {{accent}}; border-radius: 14px; pointer-events: none;
+}
+
+.cert-inner {
+    padding: 50px 60px; text-align: center; position: relative;
+}
+
+/* Corner ornaments */
+.corner { position: absolute; width: 60px; height: 60px; opacity: 0.15; }
+.corner svg { width: 100%; height: 100%; }
+.corner.tl { top: 20px; left: 20px; }
+.corner.tr { top: 20px; right: 20px; transform: rotate(90deg); }
+.corner.bl { bottom: 20px; left: 20px; transform: rotate(-90deg); }
+.corner.br { bottom: 20px; right: 20px; transform: rotate(180deg); }
+
+.org { font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: {{brand}}; margin-bottom: 20px; }
+.cert-title { font-size: 36px; color: {{dark}}; margin-bottom: 6px; letter-spacing: -0.5px; }
+.cert-sub { font-size: 14px; color: #888; margin-bottom: 30px; }
+
+.recipient {
+    font-size: 28px; color: {{brand}}; margin: 20px 0;
+    padding: 10px 0; border-bottom: 2px solid {{accent}}; display: inline-block;
+}
+
+.description { font-size: 13px; color: #555; max-width: 500px; margin: 16px auto 30px; line-height: 1.8; }
+
+.details { display: flex; justify-content: center; gap: 60px; margin: 20px 0; }
+.detail { text-align: center; }
+.detail .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 4px; }
+.detail .value { font-size: 13px; color: {{dark}}; font-weight: 600; }
+
+.seal {
+    margin-top: 30px; display: inline-block;
+    width: 70px; height: 70px; border: 3px solid {{accent}};
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    margin: 20px auto 0;
+}
+.seal-inner {
+    width: 56px; height: 56px; border: 1px solid {{accent}};
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: {{brand}};
+}
+
+.footer-cert { font-size: 10px; color: #bbb; margin-top: 20px; }
+</style></head><body>
+
+<div class="cert">
+    <div class="cert-inner">
+        <div class="org">{{logo}}</div>
+        <div class="cert-title">{{title}}</div>
+        <div class="cert-sub">{{subtitle}}</div>
+        <div class="recipient">{{recipient}}</div>
+        <div class="description">{{description}}</div>
+        <div class="details">
+            <div class="detail">
+                <div class="label">Дата</div>
+                <div class="value">{{date}}</div>
+            </div>
+            <div class="detail">
+                <div class="label">Номер</div>
+                <div class="value">{{number}}</div>
+            </div>
+            <div class="detail">
+                <div class="label">Подпись</div>
+                <div class="value">{{author}}</div>
+            </div>
+        </div>
+        <div class="seal"><div class="seal-inner">{{logo}}</div></div>
+        <div class="footer-cert">{{footer}}</div>
+    </div>
+</div>
+
+</body></html>
