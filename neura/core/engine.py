@@ -15,6 +15,7 @@ import glob
 import json as _json
 import logging
 import os
+import shutil
 import signal
 import time
 import tempfile
@@ -44,7 +45,27 @@ def _cleanup_temp_files():
 
 atexit.register(_cleanup_temp_files)
 
-DEFAULT_TOOLS = ["Read", "Glob", "Grep", "Write", "Edit", "Bash(python3|ls|mkdir|cat)"]
+# Expanded Bash whitelist for capsules (v2, 2026-04-08)
+# Regex: commands that capsules CAN run. Blacklist in safe-bash-hook.py blocks dangerous ones.
+_BASH_WHITELIST = (
+    "python3|ls|mkdir|cat|head|tail|wc|sort|uniq|cut|tr|tee"  # basics
+    "|find|file|stat|du|df|date|echo|printf"                   # files & info
+    "|curl|wget"                                                # network (read-only fetches)
+    "|zip|unzip|tar|gzip|gunzip"                                # archives
+    "|md5sum|sha256sum"                                         # checksums
+    "|convert|ffmpeg|ffprobe"                                   # media
+    "|jq"                                                       # JSON
+    "|touch|cp|mv|ln|basename|dirname|realpath|mktemp"          # file ops
+    "|diff|comm|paste"                                          # comparison
+    "|which|whoami|id|env|pwd"                                  # environment (read-only)
+    "|sleep|true|false|test"                                    # control
+    "|systemctl|journalctl"                                     # services (blacklist guards platform ones)
+)
+DEFAULT_TOOLS = [
+    "Read", "Glob", "Grep", "Write", "Edit",
+    "WebSearch", "WebFetch",
+    f"Bash({_BASH_WHITELIST})",
+]
 
 
 @dataclass
@@ -91,10 +112,18 @@ TOOL_LABELS = {
 
 
 def _kill_process_tree(proc) -> None:
-    """Kill process and all its children via process group."""
+    """Kill process and all its children via process group.
+
+    Safety: never kill our own process group (would take down the whole service).
+    """
     try:
         pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGKILL)
+        if pgid == os.getpgrp():
+            # Child shares our group — kill only the child, not the group
+            logger.warning("_kill_process_tree: child shares our pgid, killing proc only")
+            proc.kill()
+        else:
+            os.killpg(pgid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
     except OSError:
@@ -110,7 +139,8 @@ class ClaudeEngine:
 
     def __init__(self, default_config: EngineConfig | None = None):
         import shutil
-        if not shutil.which("claude"):
+        self._claude_bin = shutil.which("claude")
+        if not self._claude_bin:
             raise RuntimeError("Claude CLI not found. Install: npm install -g @anthropic-ai/claude-code")
         self._default_config = default_config or EngineConfig()
 
@@ -124,6 +154,15 @@ class ClaudeEngine:
         For prompts >120KB: writes to temp file, pipes via stdin.
         For smaller prompts: direct -p argument (safe up to 128KB).
         """
+        # Guard: claude binary must be resolved (shutil.which may return None during CLI update)
+        if not self._claude_bin:
+            self._claude_bin = shutil.which("claude")
+        if not self._claude_bin:
+            raise FileNotFoundError("claude CLI not found — binary missing or PATH not set")
+
+        # Strip null bytes: OS exec rejects arguments containing \x00
+        prompt = prompt.replace("\x00", "")
+
         prompt_bytes = len(prompt.encode("utf-8"))
         prompt_file = None
 
@@ -134,14 +173,14 @@ class ClaudeEngine:
                 f.write(prompt)
             logger.info(f"Prompt >120KB ({prompt_bytes}B), will use stdin pipe from: {prompt_file}")
             cmd = [
-                "claude", "-p", "-",
+                self._claude_bin, "-p", "-",
                 "--model", config.model,
                 "--output-format", "stream-json",
                 "--verbose",
             ]
         else:
             cmd = [
-                "claude", "-p", prompt,
+                self._claude_bin, "-p", prompt,
                 "--model", config.model,
                 "--output-format", "stream-json",
                 "--verbose",
@@ -243,6 +282,7 @@ class ClaudeEngine:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
                 cwd=cfg.home_dir if cfg.home_dir else None,
+                start_new_session=True,
             )
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 proc.communicate(input=stdin_data), timeout=cfg.timeout
@@ -296,6 +336,7 @@ class ClaudeEngine:
             env=env,
             cwd=cfg.home_dir if cfg.home_dir else None,
             limit=2 * 1024 * 1024,
+            start_new_session=True,
         )
 
         # If using stdin, write prompt and close stdin
@@ -307,9 +348,9 @@ class ClaudeEngine:
         try:
             assert proc.stdout is not None
             while True:
-                # Per-line timeout: 120s (enough for tool execution)
+                # Per-line timeout: 240s default, tunable via NEURA_READLINE_TIMEOUT env (was 120s, hit CPU-bound timeouts)
                 line = await asyncio.wait_for(
-                    proc.stdout.readline(), timeout=min(cfg.timeout, 120)
+                    proc.stdout.readline(), timeout=min(cfg.timeout, int(os.environ.get("NEURA_READLINE_TIMEOUT", "240")))
                 )
                 if not line:
                     break
