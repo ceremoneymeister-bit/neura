@@ -348,9 +348,9 @@ class ClaudeEngine:
         try:
             assert proc.stdout is not None
             while True:
-                # Per-line timeout: 240s default, tunable via NEURA_READLINE_TIMEOUT env (was 120s, hit CPU-bound timeouts)
+                # Per-line timeout: 360s default, tunable via NEURA_READLINE_TIMEOUT env (was 120→240→360s, heavy prompts need more)
                 line = await asyncio.wait_for(
-                    proc.stdout.readline(), timeout=min(cfg.timeout, int(os.environ.get("NEURA_READLINE_TIMEOUT", "240")))
+                    proc.stdout.readline(), timeout=min(cfg.timeout, int(os.environ.get("NEURA_READLINE_TIMEOUT", "360")))
                 )
                 if not line:
                     break

@@ -22,19 +22,40 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectCount = useRef(0)
-  const MAX_RECONNECTS = 5
+  const lastMessageTime = useRef<number>(0)
+  const staleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const MAX_RECONNECTS = 8
+
+  const clearStaleTimer = () => {
+    if (staleTimer.current) {
+      clearTimeout(staleTimer.current)
+      staleTimer.current = null
+    }
+  }
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current)
       reconnectTimer.current = null
     }
+    clearStaleTimer()
     if (wsRef.current) {
       wsRef.current.onclose = null
       wsRef.current.close()
       wsRef.current = null
     }
     setStatus('disconnected')
+  }, [])
+
+  const scheduleReconnect = useCallback((connectFn: () => void) => {
+    if (reconnectCount.current < MAX_RECONNECTS) {
+      const delay = Math.min(1000 * 2 ** reconnectCount.current, 15000)
+      reconnectCount.current++
+      setStatus('disconnected')
+      reconnectTimer.current = setTimeout(connectFn, delay)
+    } else {
+      setStatus('error')
+    }
   }, [])
 
   const connect = useCallback(() => {
@@ -52,6 +73,7 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     }
 
     ws.onmessage = (evt: MessageEvent<string>) => {
+      lastMessageTime.current = Date.now()
       try {
         const chunk = JSON.parse(evt.data) as WsChunk
         // Heartbeat: respond to server ping with pong
@@ -60,6 +82,7 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
           return
         }
         if (chunk.type === 'done') {
+          clearStaleTimer()
           onDone?.(chunk)
         }
         onMessage(chunk)
@@ -69,24 +92,21 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     }
 
     ws.onerror = () => {
-      setStatus('error')
+      // Don't set 'error' immediately — let onclose handle reconnect
+      // onerror is always followed by onclose
     }
 
     ws.onclose = (evt) => {
       wsRef.current = null
+      clearStaleTimer()
       if (evt.code === 4001) {
         // Auth error — don't reconnect
         setStatus('error')
         return
       }
-      setStatus('disconnected')
-      if (reconnectCount.current < MAX_RECONNECTS) {
-        const delay = Math.min(1000 * 2 ** reconnectCount.current, 10000)
-        reconnectCount.current++
-        reconnectTimer.current = setTimeout(connect, delay)
-      }
+      scheduleReconnect(connect)
     }
-  }, [conversationId, disconnect, onMessage, onDone])
+  }, [conversationId, disconnect, onMessage, onDone, scheduleReconnect])
 
   useEffect(() => {
     if (conversationId) {
@@ -98,13 +118,25 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     return () => disconnect()
   }, [conversationId, connect, disconnect])
 
-  const send = useCallback((text: string, files: string[] = [], model?: string) => {
+  const send = useCallback((text: string, files: string[] = [], model?: string): boolean => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ text, files, ...(model && { model }) }))
+      // Start stale connection detection — if no message in 45s, emit error
+      lastMessageTime.current = Date.now()
+      clearStaleTimer()
+      staleTimer.current = setTimeout(() => {
+        if (Date.now() - lastMessageTime.current >= 44000) {
+          onMessage({ type: 'error', content: 'Нет ответа от сервера. Попробуйте отправить снова.' })
+        }
+      }, 45000)
+      return true
     }
-  }, [])
+    // Socket not open — notify caller
+    return false
+  }, [onMessage])
 
   const sendCancel = useCallback(() => {
+    clearStaleTimer()
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'cancel' }))
     }

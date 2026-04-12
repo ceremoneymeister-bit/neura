@@ -21,7 +21,7 @@
 
   --text-primary: #faf9f5;
   --text-secondary: #c1bfb5;
-  --text-muted: #9b9991;
+  --text-muted: #b0afa7;
 
   --border: rgba(225, 224, 217, 0.08);
   --border-focus: #7c3aed;
@@ -91,7 +91,7 @@
   --color-accent-hover: #6d28d9;
   --color-text-primary: #faf9f5;
   --color-text-secondary: #c1bfb5;
-  --color-text-muted: #9b9991;
+  --color-text-muted: #b0afa7;
   --color-border: rgba(225, 224, 217, 0.08);
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'Lora', Georgia, serif;
@@ -246,6 +246,7 @@ textarea:focus-visible,
 .prose-neura {
   line-height: 1.65;
   word-break: break-word;
+  overflow-wrap: anywhere;
   -webkit-user-select: text;
   user-select: text;
 }
@@ -275,5 +276,6 @@ textarea:focus-visible,
   margin: 1rem 0;
 }
 
+.prose-neura pre { max-width: 100%; overflow-x: auto; }
 .prose-neura strong { color: var(--text-primary); font-weight: 600; }
 .prose-neura em     { color: var(--text-secondary); font-style: italic; }

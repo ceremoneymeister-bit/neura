@@ -34,6 +34,7 @@ class HealthMonitor:
         self._alert = alert_sender
         self._interval = interval
         self._prev_state: dict[str, bool] = {}
+        self._fail_streak: dict[str, int] = {}  # consecutive failures before alerting
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
@@ -78,24 +79,36 @@ class HealthMonitor:
         """Run all checks and handle state transitions."""
         results = await self.check_all()
         for status in results:
+            # Bot checks require 2 consecutive failures to avoid transient Telegram API noise
+            required_streak = 2 if status.name.startswith("bot:") else 1
+
             prev = self._prev_state.get(status.name)
+
+            if not status.healthy:
+                self._fail_streak[status.name] = self._fail_streak.get(status.name, 0) + 1
+            else:
+                self._fail_streak[status.name] = 0
+
+            streak = self._fail_streak.get(status.name, 0)
+
             if prev is None:
-                # First check — alert if unhealthy
+                # First check — alert only if already failing required streak
                 self._prev_state[status.name] = status.healthy
-                if not status.healthy:
+                if not status.healthy and streak >= required_streak:
                     await self._alert.send(
                         f"{status.name}: {status.detail}",
                         alert_type=HEALTH_FAIL,
                         capsule_id=status.name,
                     )
             elif prev is True and not status.healthy:
-                # Transition: healthy → unhealthy
-                await self._alert.send(
-                    f"{status.name}: {status.detail}",
-                    alert_type=HEALTH_FAIL,
-                    capsule_id=status.name,
-                )
-                self._prev_state[status.name] = False
+                # Transition: healthy → unhealthy — wait for required streak
+                if streak >= required_streak:
+                    await self._alert.send(
+                        f"{status.name}: {status.detail}",
+                        alert_type=HEALTH_FAIL,
+                        capsule_id=status.name,
+                    )
+                    self._prev_state[status.name] = False
             elif prev is False and status.healthy:
                 # Transition: unhealthy → healthy
                 await self._alert.send(
@@ -124,9 +137,13 @@ class HealthMonitor:
 
     async def _check_claude_cli(self) -> HealthStatus:
         """Check Claude CLI is available."""
-        path = shutil.which("claude")
-        if path:
-            return HealthStatus("claude_cli", True, path, time.monotonic())
+        # Retry up to 3 times — avoids false alarms right after service restart
+        for attempt in range(3):
+            path = shutil.which("claude")
+            if path:
+                return HealthStatus("claude_cli", True, path, time.monotonic())
+            if attempt < 2:
+                await asyncio.sleep(2)
         return HealthStatus("claude_cli", False, "not found", time.monotonic())
 
     async def _check_bot(self, capsule_id: str, capsule) -> HealthStatus:

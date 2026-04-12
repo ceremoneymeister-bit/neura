@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: rodion_radkevich/SYSTEM.md
 skills:
 - copywriting

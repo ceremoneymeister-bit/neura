@@ -9,14 +9,55 @@
 
 All data in PostgreSQL. Pool injected via DI (asyncpg.Pool or mock).
 Provides build_context_parts() to bridge with context.py.
+
+Long-term memory uses pgvector cosine similarity (via embedding VECTOR(1024)
+from intfloat/multilingual-e5-large, shared singleton with core.vectordb).
+Falls back to ILIKE keyword search if the embedding model is unavailable.
 """
+import asyncio
 import logging
+import time as _time_mod
 from dataclasses import dataclass, field
 from datetime import date, time, datetime, timezone, timedelta
 
 from neura.core.context import ContextParts
 
 logger = logging.getLogger(__name__)
+
+
+async def _embed_text(text: str, *, is_query: bool) -> list[float] | None:
+    """Compute a 1024-dim embedding for `text` using the e5-large singleton.
+
+    Returns None if the model cannot be loaded (caller falls back to ILIKE).
+    Offloaded to a thread so we don't block the event loop (~30ms CPU).
+    """
+    try:
+        from neura.core.vectordb import _get_model, _IS_E5_MODEL
+    except Exception as e:  # pragma: no cover
+        logger.debug(f"vectordb import failed: {e}")
+        return None
+
+    model = _get_model()
+    if model is None:
+        return None
+
+    prefix = ("query: " if is_query else "passage: ") if _IS_E5_MODEL else ""
+    payload = f"{prefix}{text}"
+
+    def _encode() -> list[float]:
+        vec = model.encode([payload], show_progress_bar=False)
+        return vec[0].tolist()
+
+    try:
+        return await asyncio.to_thread(_encode)
+    except Exception as e:
+        logger.warning(f"embed_text failed: {e}")
+        return None
+
+
+def _vec_to_pg_literal(vec: list[float]) -> str:
+    """Format a Python list as a pgvector literal: '[0.1,0.2,...]'."""
+    return "[" + ",".join(f"{x:.7f}" for x in vec) + "]"
 
 
 def _truncate_word(text: str, max_chars: int) -> str:
@@ -112,7 +153,7 @@ class MemoryStore:
         return [_row_to_diary(r) for r in rows]
 
     async def get_recent_diary(self, capsule_id: str,
-                               days: int = 3, per_day: int = 5,
+                               days: int = 3, per_day: int = 10,
                                thread_id: int | None = None) -> list[DiaryEntry]:
         """Get recent diary entries (excluding today), chronological order.
 
@@ -181,21 +222,60 @@ class MemoryStore:
 
     async def add_memory(self, capsule_id: str, content: str,
                          source: str = "auto") -> int:
-        """Add a long-term memory entry."""
+        """Add a long-term memory entry with e5-large embedding.
+
+        Embedding is computed off the event loop. If the model is unavailable
+        (first boot, ML deps missing), the row is still inserted with
+        embedding=NULL and will be picked up by the next backfill run.
+        """
+        embedding = await _embed_text(content, is_query=False)
+        if embedding is None:
+            return await self._pool.fetchval(
+                """INSERT INTO memory (capsule_id, content, source)
+                   VALUES ($1, $2, $3) RETURNING id""",
+                capsule_id, content, source,
+            )
         return await self._pool.fetchval(
-            """INSERT INTO memory (capsule_id, content, source)
-               VALUES ($1, $2, $3) RETURNING id""",
-            capsule_id, content, source,
+            """INSERT INTO memory (capsule_id, content, source, embedding)
+               VALUES ($1, $2, $3, $4::vector) RETURNING id""",
+            capsule_id, content, source, _vec_to_pg_literal(embedding),
         )
 
     async def search_memory(self, capsule_id: str, query: str,
                             limit: int = 5) -> list[str]:
-        """Search long-term memory by keyword."""
+        """Search long-term memory by cosine similarity (pgvector).
+
+        Falls back to ILIKE keyword search if the embedding model is
+        unavailable. Logs latency for the `search_memory_latency_ms` metric.
+        """
+        t0 = _time_mod.perf_counter()
+        query_vec = await _embed_text(query, is_query=True)
+
+        if query_vec is None:
+            rows = await self._pool.fetch(
+                """SELECT content FROM memory
+                   WHERE capsule_id = $1 AND content ILIKE $2
+                   ORDER BY created_at DESC LIMIT $3""",
+                capsule_id, f"%{query}%", limit,
+            )
+            dt_ms = (_time_mod.perf_counter() - t0) * 1000
+            logger.info(
+                f"search_memory_latency_ms={dt_ms:.1f} mode=ilike "
+                f"capsule={capsule_id} hits={len(rows)}"
+            )
+            return [r["content"] for r in rows]
+
+        # pgvector cosine: rows with NULL embedding are excluded automatically
         rows = await self._pool.fetch(
             """SELECT content FROM memory
-               WHERE capsule_id = $1 AND content ILIKE $2
-               ORDER BY created_at DESC LIMIT $3""",
-            capsule_id, f"%{query}%", limit,
+               WHERE capsule_id = $1 AND embedding IS NOT NULL
+               ORDER BY embedding <=> $2::vector LIMIT $3""",
+            capsule_id, _vec_to_pg_literal(query_vec), limit,
+        )
+        dt_ms = (_time_mod.perf_counter() - t0) * 1000
+        logger.info(
+            f"search_memory_latency_ms={dt_ms:.1f} mode=cosine "
+            f"capsule={capsule_id} hits={len(rows)}"
         )
         return [r["content"] for r in rows]
 
@@ -283,7 +363,7 @@ class MemoryStore:
             thread_id=thread_id)
         recent = await self.get_recent_diary(
             capsule_id, days=ctx_cfg.get("recent_days", 3),
-            per_day=ctx_cfg.get("recent_per_day", 5),
+            per_day=ctx_cfg.get("recent_per_day", 10),
             thread_id=thread_id)
         memory = await self.search_memory(capsule_id, user_prompt)
         learnings = await self.get_learnings(capsule_id)

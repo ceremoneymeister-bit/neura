@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: maxim_dmitry_selestinsky/SYSTEM.md
 skills:
 - copywriting
@@ -38,6 +29,8 @@ skills:
 - voice-to-action
 - nano-banana-pro
 - telegram-bot-builder
+- notion-tasks
+- google-oauth
 memory:
   diary_retention_days: 90
   max_long_term_entries: 100

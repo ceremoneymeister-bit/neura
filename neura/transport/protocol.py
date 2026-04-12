@@ -56,6 +56,13 @@ class MessageFile:
 
 
 @dataclass
+class PendingAction:
+    """Action awaiting user confirmation via inline buttons."""
+    action_type: str    # e.g. "post_vk", "send_dm", "create_deal"
+    description: str    # Human-readable: "Пост в VK группу НАГРАДА"
+
+
+@dataclass
 class OutgoingMessage:
     """Transport-agnostic response."""
     text: str
@@ -65,6 +72,7 @@ class OutgoingMessage:
     rules: list[str] = field(default_factory=list)
     telegraph_url: str | None = None
     is_long: bool = False
+    pending_action: PendingAction | None = None
 
 
 # ── Response Parser ────────────────────────────────────────────
@@ -81,17 +89,20 @@ class ResponseParser:
     @staticmethod
     def parse(engine_text: str,
               allowed_prefixes: list[str] | None = None) -> OutgoingMessage:
-        """Full parse pipeline: markers → files → telegraph check."""
+        """Full parse pipeline: markers → files → action → telegraph check."""
         text = engine_text
 
         # 1. Extract markers
         text, learnings, corrections, rules = ResponseParser._parse_markers(text)
 
-        # 2. Extract files
+        # 2. Extract action confirmation marker
+        text, pending_action = ResponseParser._extract_action(text)
+
+        # 3. Extract files
         prefixes = allowed_prefixes or list(DEFAULT_ALLOWED_PREFIXES)
         text, files = ResponseParser._extract_files(text, prefixes)
 
-        # 3. Long text flag
+        # 4. Long text flag
         is_long = len(text) > MAX_MSG_LENGTH
 
         return OutgoingMessage(
@@ -101,6 +112,7 @@ class ResponseParser:
             corrections=corrections,
             rules=rules,
             is_long=is_long,
+            pending_action=pending_action,
         )
 
     @staticmethod
@@ -118,11 +130,24 @@ class ResponseParser:
         return cleaned, [l.strip() for l in learnings], [c.strip() for c in corrections], [r.strip() for r in rules]
 
     @staticmethod
+    def _extract_action(text: str) -> tuple[str, PendingAction | None]:
+        """Extract [CONFIRM_ACTION:type|description] marker."""
+        match = re.search(r'\[CONFIRM_ACTION:([^|\]]+)\|([^\]]+)\]', text)
+        if not match:
+            return text, None
+        pending = PendingAction(
+            action_type=match.group(1).strip(),
+            description=match.group(2).strip(),
+        )
+        cleaned = re.sub(r'\[CONFIRM_ACTION:[^\]]+\]', '', text).strip()
+        return cleaned, pending
+
+    @staticmethod
     def _extract_files(text: str,
                        allowed_prefixes: list[str]) -> tuple[str, list[MessageFile]]:
         """Extract [FILE:/path] markers with path traversal protection."""
-        raw_files = re.findall(r'\[FILE:(.*?)\]', text)
-        cleaned = re.sub(r'\[FILE:.*?\]', '', text).strip()
+        raw_files = re.findall(r'\[FILE:(.*?)\]', text, re.DOTALL)
+        cleaned = re.sub(r'\[FILE:.*?\]', '', text, flags=re.DOTALL).strip()
 
         safe_files: list[MessageFile] = []
         for fp in raw_files:
@@ -293,17 +318,21 @@ _whisper_model = None
 
 async def transcribe_voice(file_path: str) -> str:
     """Transcribe voice: Deepgram (primary) -> Whisper (fallback)."""
+    logger.info(f"Transcribing voice: {file_path}")
     deepgram_key = os.environ.get("DEEPGRAM_API_KEY")
     if deepgram_key:
         try:
             result = await _transcribe_deepgram(file_path)
             if result and not result.startswith("\u274c"):
+                logger.info(f"Voice transcribed via Deepgram: {len(result)} chars")
                 return result
             logger.warning(f"Deepgram failed, falling back to Whisper: {result}")
         except Exception as e:
             logger.warning(f"Deepgram error, falling back to Whisper: {e}")
 
-    return await _transcribe_whisper(file_path)
+    result = await _transcribe_whisper(file_path)
+    logger.info(f"Voice transcribed via Whisper: {len(result)} chars")
+    return result
 
 
 def _guess_audio_content_type(file_path: str) -> str:

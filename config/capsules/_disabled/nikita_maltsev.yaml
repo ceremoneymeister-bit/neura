@@ -1,10 +1,10 @@
-id: maxim_belousov
-name: Нэйра
+id: nikita_maltsev
+name: Нейра
 owner:
-  name: Максим Белоусов
-  telegram_id: 482808155
+  name: Никита Мальцев
+  telegram_id: 107365522
 telegram:
-  bot_token: ${MAXIM_BOT_TOKEN}
+  bot_token: ${NIKITA_BOT_TOKEN}
   features:
     streaming: true
     voice_input: true
@@ -15,7 +15,7 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  system_prompt: maxim_belousov/SYSTEM.md
+  system_prompt: nikita_maltsev/SYSTEM.md
 skills:
 - copywriting
 - smart-response
@@ -67,26 +67,21 @@ memory:
     diary_user_chars: 300
     diary_bot_chars: 400
 employees:
-- name: Татьяна Смык
-  role: assistant
-  telegram_id: 805084904
-  username: TatyanaSmyk
-- name: Дмитрий Селестинский
-  role: tech
-  telegram_id: 706798763
-  username: Selestinskiy
 - name: Дмитрий Ростовцев
   role: producer
   telegram_id: 1260958591
   username: ceremoneymeister
-internal_groups:
-- -1002973142021
-- -1003767169583
-- -1003806649394
-mention_required_groups:
-- -1003767169583
 rate_limit:
-  max_per_day: 500
-  warn_at: 400
+  max_per_day: 100
+  warn_at: 80
 trial:
-  enabled: false
+  enabled: true
+  days: 5
+  started_at: "2026-04-01T15:45:55+00:00"
+  expired_message: '⏰ Ваш 5-дневный пробный период завершён.
+
+
+    Если хотите продолжить работу с AI-ассистентом — свяжитесь с Дмитрием: @ceremoneymeister
+
+
+    Спасибо, что попробовали Нейру! 🙏'

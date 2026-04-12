@@ -157,7 +157,7 @@ export function SettingsPage() {
         </Section>
 
         <Section title="Аккаунт">
-          <Button variant="danger" icon={<LogOut size={14} />} onClick={logout}>
+          <Button variant="danger" icon={<LogOut size={14} />} onClick={() => { if (window.confirm('Выйти из аккаунта?')) logout() }}>
             Выйти из аккаунта
           </Button>
         </Section>

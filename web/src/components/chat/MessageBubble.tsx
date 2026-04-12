@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
-import { Copy, Check, RefreshCw, Clock } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Copy, Check, RefreshCw, Clock, X, Download } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
@@ -8,6 +9,13 @@ import { CodeBlock } from './CodeBlock'
 import { NeuraIcon } from '@/components/ui/NeuraIcon'
 import { fileIcon } from '@/utils/time'
 import { copyToClipboard } from '@/utils/clipboard'
+
+function formatModel(model: string): string {
+  if (model.includes('opus')) return 'Opus'
+  if (model.includes('haiku')) return 'Haiku'
+  if (model.includes('sonnet')) return 'Sonnet'
+  return model.split('-')[0]
+}
 
 interface MessageBubbleProps {
   message: Message
@@ -29,7 +37,7 @@ const markdownComponents: Components = {
       return <CodeBlock language={lang} code={String(children).replace(/\n$/, '')} />
     }
     return (
-      <code className="font-mono text-xs bg-[var(--bg-input)] px-1.5 py-0.5 rounded text-[var(--code-inline)] border border-[var(--border)]">
+      <code className="font-mono text-xs bg-[var(--bg-input)] px-1.5 py-0.5 rounded text-[var(--code-inline)] border border-[var(--border)] break-all">
         {children}
       </code>
     )
@@ -79,16 +87,84 @@ const markdownComponents: Components = {
   },
   img({ src, alt }) {
     return (
-      <a href={src} target="_blank" rel="noopener noreferrer" className="block my-3">
+      <button
+        type="button"
+        onClick={() => {
+          document.dispatchEvent(new CustomEvent('neura:lightbox', { detail: { src, alt } }))
+        }}
+        className="block my-3 cursor-pointer bg-transparent border-0 p-0"
+      >
         <img
           src={src}
           alt={alt ?? ''}
           loading="lazy"
-          className="max-w-full max-h-[400px] rounded-lg border border-[var(--border)] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+          className="max-w-full max-h-[400px] rounded-lg border border-[var(--border)] object-contain hover:opacity-90 transition-opacity"
         />
-      </a>
+      </button>
     )
   },
+}
+
+export function ImageLightbox() {
+  const [image, setImage] = useState<{ src: string; alt: string } | null>(null)
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.src) setImage({ src: detail.src, alt: detail.alt ?? '' })
+    }
+    document.addEventListener('neura:lightbox', handler)
+    return () => document.removeEventListener('neura:lightbox', handler)
+  }, [])
+
+  useEffect(() => {
+    if (!image) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setImage(null)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [image])
+
+  return (
+    <AnimatePresence>
+      {image && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setImage(null)}
+        >
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
+            <a
+              href={image.src}
+              download
+              onClick={(e) => e.stopPropagation()}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="Скачать"
+            >
+              <Download size={18} />
+            </a>
+            <button
+              onClick={() => setImage(null)}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="Закрыть"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <img
+            src={image.src}
+            alt={image.alt}
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
 }
 
 export function MessageBubble({ message, isLast = false, onRegenerate }: MessageBubbleProps) {
@@ -148,7 +224,7 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
       </div>
 
       <div className="flex flex-col gap-1 max-w-[88%] min-w-0 items-start">
-        <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-[var(--text-primary)]">
+        <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-[var(--text-primary)]">
           <div className="absolute -top-7 right-0 z-10 flex items-center gap-1 hover-hide bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-1.5 py-0.5 shadow-lg">
             <button
               onClick={handleCopy}
@@ -197,6 +273,22 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
               {message.content}
             </ReactMarkdown>
           </div>
+
+          {(message.model || message.duration_sec != null || message.tokens_used != null) && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border)]/50">
+              {message.model && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-mono">
+                  {formatModel(message.model)}
+                </span>
+              )}
+              {message.duration_sec != null && (
+                <span className="text-[10px] text-[var(--text-muted)]">{message.duration_sec.toFixed(1)}s</span>
+              )}
+              {message.tokens_used != null && (
+                <span className="text-[10px] text-[var(--text-muted)]">{message.tokens_used} tok</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

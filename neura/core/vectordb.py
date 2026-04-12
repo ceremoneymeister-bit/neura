@@ -54,6 +54,8 @@ INDEX_EXTENSIONS = {
 SKIP_DIRS = {
     "node_modules", "__pycache__", ".git", ".cache", "dist",
     "site-packages", ".mypy_cache", ".pytest_cache",
+    ".antigravity-server", ".npm", ".npm-global", "ms-playwright",
+    ".venv", "venv", ".gemini", ".claude",
 }
 
 SKIP_FILES = {

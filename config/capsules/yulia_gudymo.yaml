@@ -1,5 +1,5 @@
 id: yulia_gudymo
-name: Нейра — AI-ассистент
+name: Нейра
 owner:
   name: Юлия Гудымо
   telegram_id: 398239749
@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: yulia_gudymo/SYSTEM.md
 skills:
 - copywriting

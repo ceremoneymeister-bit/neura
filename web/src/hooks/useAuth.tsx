@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveAuth, navigate])
 
   const logout = useCallback(() => {
+    sessionStorage.clear()
     localStorage.removeItem(TOKEN_KEY)
     setToken(null)
     setUser(null)

@@ -3,6 +3,8 @@ import { Outlet, useParams } from 'react-router-dom'
 import { PanelLeft } from 'lucide-react'
 import { StatusBar } from './StatusBar'
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { NetworkStatus } from '@/components/ui/NetworkStatus'
+import { ImageLightbox } from '@/components/chat/MessageBubble'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export function AppLayout() {
@@ -36,6 +38,8 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full bg-[var(--bg-primary)] overflow-hidden">
+      <NetworkStatus />
+      <ImageLightbox />
       {/* Sidebar — desktop */}
       <AnimatePresence initial={false}>
         {sidebarOpen && (
@@ -69,7 +73,7 @@ export function AppLayout() {
               onClick={() => setSidebarOpen(false)}
             />
             <motion.div
-              className="relative z-50 flex flex-col w-[260px] bg-[var(--bg-sidebar)] border-r border-[var(--border)]/40"
+              className="relative z-50 flex flex-col w-[min(260px,85vw)] bg-[var(--bg-sidebar)] border-r border-[var(--border)]/40"
               initial={{ x: -260 }}
               animate={{ x: 0 }}
               exit={{ x: -260 }}

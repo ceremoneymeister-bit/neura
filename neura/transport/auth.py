@@ -64,6 +64,33 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
 
+def refresh_token(old_token: str) -> str:
+    """Decode an expired token (up to 7 days) and issue a fresh one.
+
+    Returns a new JWT with refreshed expiry.
+    Raises jwt.InvalidTokenError if the token is invalid or expired beyond 7 days.
+    """
+    try:
+        payload = jwt.decode(
+            old_token, JWT_SECRET, algorithms=[JWT_ALGORITHM],
+            options={"verify_exp": False},
+        )
+    except jwt.InvalidTokenError:
+        raise
+
+    # Check that the token hasn't been expired for more than 7 days
+    exp = payload.get("exp")
+    if exp is not None:
+        exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
+        if datetime.now(timezone.utc) - exp_dt > timedelta(days=7):
+            raise jwt.InvalidTokenError("Token expired beyond refresh window")
+
+    user_id = int(payload["sub"])
+    email = payload.get("email", "")
+    capsule_id = payload.get("capsule_id")
+    return create_token(user_id, email, capsule_id)
+
+
 # ── FastAPI dependency ───────────────────────────────────────────
 
 def get_current_user(request: Request) -> dict:
@@ -86,13 +113,13 @@ def get_current_user(request: Request) -> dict:
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.InvalidTokenError as exc:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {exc}",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

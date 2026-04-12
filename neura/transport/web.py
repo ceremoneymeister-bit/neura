@@ -37,7 +37,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 from neura.core.engine import EngineConfig
 from neura.transport.auth import (
-    create_token, get_current_user, hash_password, verify_password,
+    create_token, get_current_user, hash_password, refresh_token, verify_password,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,11 +141,11 @@ class StreamSession:
     """A background streaming session, decoupled from WebSocket lifecycle.
 
     Chunks are kept in memory for replay on reconnect.
-    Max 200 chunks retained (prevents memory leak on long streams).
-    Sessions auto-expire after 10 minutes of being done.
+    Max 100 chunks retained (prevents memory leak on long streams).
+    Sessions auto-expire after 3 minutes of being done.
     """
 
-    _MAX_CHUNKS = 200
+    _MAX_CHUNKS = 100
 
     def __init__(self, conv_id: int, user_id: int):
         self.conv_id = conv_id
@@ -176,8 +176,8 @@ class StreamSession:
 
     @property
     def expired(self) -> bool:
-        """Session is expired if done for >10 minutes."""
-        return self.done and self.done_at > 0 and (time.monotonic() - self.done_at) > 600
+        """Session is expired if done for >5 minutes."""
+        return self.done and self.done_at > 0 and (time.monotonic() - self.done_at) > 300
 
 
 class StreamManager:
@@ -220,6 +220,15 @@ class StreamManager:
         if len(done_sessions) > 5:
             for cid, _ in done_sessions[:-5]:
                 sessions.pop(cid, None)
+
+    async def periodic_cleanup(self, interval: int = 60):
+        """Background task: periodically remove expired sessions."""
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                self._cleanup()
+            except Exception as exc:
+                logger.warning("StreamManager cleanup error: %s", exc)
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────
@@ -321,6 +330,10 @@ def create_web_app(
     # Stream manager for background sessions
     stream_mgr = StreamManager()
 
+    @app.on_event("startup")
+    async def _start_stream_cleanup():
+        asyncio.create_task(stream_mgr.periodic_cleanup())
+
     # Claude CLI session_id per conversation (conv_id → session_id)
     # Enables --resume: continue existing session instead of starting fresh
     _claude_sessions: dict[int, str] = {}
@@ -337,8 +350,8 @@ def create_web_app(
         CORSMiddleware,
         allow_origins=_allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     # ── Request logging middleware ───────────────────────────────
@@ -437,6 +450,25 @@ def create_web_app(
             "token": token,
             "user": _user_to_dict(row),
         }
+
+    @app.post("/api/auth/refresh")
+    async def auth_refresh(request: Request):
+        """Refresh a JWT token. Accepts expired tokens up to 7 days old."""
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication failed",
+            )
+        old_token = auth_header[len("Bearer "):]
+        try:
+            new_token = refresh_token(old_token)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication failed",
+            )
+        return {"token": new_token}
 
     @app.get("/api/auth/me")
     async def get_me(current_user: CurrentUser, request: Request):
@@ -897,12 +929,13 @@ def create_web_app(
         max_size = 100 * 1024 * 1024  # 100 MB
         content = await file.read()
         if len(content) > max_size:
-            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large (max 10MB)")
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл слишком большой (макс. 100 МБ)")
 
         safe_name = Path(file.filename or "upload").name
         unique_name = f"{uuid.uuid4().hex}_{safe_name}"
         dest = UPLOAD_DIR / unique_name
         dest.write_bytes(content)
+        dest.chmod(0o600)
 
         # Store in DB if pool available
         p = request.app.state.db_pool
@@ -1024,6 +1057,371 @@ def create_web_app(
             "avg_duration_sec": round(avg_duration, 1),
             "skills": skills_list,
         }
+
+    # ═══════════════════════════════════════════════════════════
+    # HEARTBEAT — CRUD for per-capsule reminders & tasks
+    # ═══════════════════════════════════════════════════════════
+
+    class HeartbeatCreate(BaseModel):
+        name: str
+        message: str
+        schedule: str = "daily 10:00"
+        type: str = "reminder"  # "reminder" | "task"
+        enabled: bool = True
+        display_name: Optional[str] = None
+
+    class HeartbeatUpdate(BaseModel):
+        name: Optional[str] = None
+        message: Optional[str] = None
+        schedule: Optional[str] = None
+        type: Optional[str] = None
+        enabled: Optional[bool] = None
+        display_name: Optional[str] = None
+
+    def _heartbeat_yaml_path(capsule_id: str) -> Path:
+        return Path(f"/opt/neura-v2/homes/{capsule_id}/heartbeat.yaml")
+
+    def _load_heartbeat_yaml(capsule_id: str) -> list[dict]:
+        p = _heartbeat_yaml_path(capsule_id)
+        if not p.exists():
+            return []
+        try:
+            data = yaml.safe_load(p.read_text(encoding="utf-8"))
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    def _save_heartbeat_yaml(capsule_id: str, items: list[dict]) -> None:
+        p = _heartbeat_yaml_path(capsule_id)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            yaml.dump(items, allow_unicode=True, default_flow_style=False),
+            encoding="utf-8",
+        )
+
+    @app.get("/api/heartbeat")
+    async def list_heartbeats(current_user: CurrentUser):
+        """List all heartbeat tasks for the current user's capsule."""
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            return []
+        items = _load_heartbeat_yaml(capsule_id)
+        return [
+            {
+                "name": it.get("name", ""),
+                "display_name": it.get("display_name") or None,
+                "message": it.get("message", ""),
+                "schedule": it.get("schedule", "daily 10:00"),
+                "type": it.get("type", "reminder"),
+                "enabled": it.get("enabled", True),
+            }
+            for it in items
+            if it.get("name")
+        ]
+
+    @app.post("/api/heartbeat", status_code=201)
+    async def create_heartbeat(body: HeartbeatCreate, current_user: CurrentUser):
+        """Create a new heartbeat task."""
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked to this account")
+        items = _load_heartbeat_yaml(capsule_id)
+        # Unique name check
+        if any(it.get("name") == body.name for it in items):
+            raise HTTPException(409, f"Heartbeat '{body.name}' already exists")
+        new_item: dict = {
+            "name": body.name,
+            "message": body.message,
+            "schedule": body.schedule,
+            "type": body.type,
+            "enabled": body.enabled,
+        }
+        if body.display_name:
+            new_item["display_name"] = body.display_name
+        items.append(new_item)
+        _save_heartbeat_yaml(capsule_id, items)
+        return {**new_item, "display_name": new_item.get("display_name") or None}
+
+    @app.patch("/api/heartbeat/{task_name}")
+    async def update_heartbeat(task_name: str, body: HeartbeatUpdate, current_user: CurrentUser):
+        """Update an existing heartbeat task by name."""
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+        items = _load_heartbeat_yaml(capsule_id)
+        found = None
+        for it in items:
+            if it.get("name") == task_name:
+                found = it
+                break
+        if not found:
+            raise HTTPException(404, f"Heartbeat '{task_name}' not found")
+        update_data = body.model_dump(exclude_none=True)
+        if "name" in update_data and update_data["name"] != task_name:
+            # Rename — check uniqueness
+            if any(it.get("name") == update_data["name"] for it in items):
+                raise HTTPException(409, f"Name '{update_data['name']}' already taken")
+        found.update(update_data)
+        _save_heartbeat_yaml(capsule_id, items)
+        return {
+            "name": found.get("name", ""),
+            "display_name": found.get("display_name") or None,
+            "message": found.get("message", ""),
+            "schedule": found.get("schedule", ""),
+            "type": found.get("type", "reminder"),
+            "enabled": found.get("enabled", True),
+        }
+
+    @app.delete("/api/heartbeat/{task_name}", status_code=204)
+    async def delete_heartbeat(task_name: str, current_user: CurrentUser):
+        """Delete a heartbeat task by name."""
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+        items = _load_heartbeat_yaml(capsule_id)
+        new_items = [it for it in items if it.get("name") != task_name]
+        if len(new_items) == len(items):
+            raise HTTPException(404, f"Heartbeat '{task_name}' not found")
+        _save_heartbeat_yaml(capsule_id, new_items)
+
+    # ═══════════════════════════════════════════════════════════
+    # DIARY
+    # ═══════════════════════════════════════════════════════════
+
+    @app.get("/api/diary")
+    async def list_diary(
+        current_user: CurrentUser, request: Request,
+        date: str | None = None, limit: int = 50, offset: int = 0,
+    ):
+        """List diary entries for the current user's capsule.
+
+        If date is provided (YYYY-MM-DD), return entries for that date.
+        Otherwise return most recent entries.
+        """
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+
+        if date:
+            try:
+                from datetime import date as date_type
+                filter_date = date_type.fromisoformat(date)
+            except ValueError:
+                raise HTTPException(400, "Invalid date format, expected YYYY-MM-DD")
+            rows = await p.fetch(
+                """SELECT id, date, time, source, user_message, bot_response,
+                          model, duration_sec, tools_used, created_at
+                   FROM diary
+                   WHERE capsule_id = $1 AND date = $2
+                   ORDER BY time DESC
+                   LIMIT $3 OFFSET $4""",
+                capsule_id, filter_date, limit, offset,
+            )
+        else:
+            rows = await p.fetch(
+                """SELECT id, date, time, source, user_message, bot_response,
+                          model, duration_sec, tools_used, created_at
+                   FROM diary
+                   WHERE capsule_id = $1
+                   ORDER BY date DESC, time DESC
+                   LIMIT $2 OFFSET $3""",
+                capsule_id, limit, offset,
+            )
+
+        return [
+            {
+                "id": r["id"],
+                "date": r["date"].isoformat() if hasattr(r["date"], "isoformat") else str(r["date"]),
+                "time": r["time"].isoformat() if hasattr(r["time"], "isoformat") else str(r["time"]),
+                "source": r["source"],
+                "user_message": r["user_message"],
+                "bot_response": r["bot_response"],
+                "model": r["model"],
+                "duration_sec": r["duration_sec"],
+                "tools_used": r["tools_used"] or [],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+
+    @app.get("/api/diary/search")
+    async def search_diary(
+        current_user: CurrentUser, request: Request,
+        q: str = "", limit: int = 20,
+    ):
+        """Search diary entries by keyword in user_message and bot_response."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+
+        if not q.strip():
+            raise HTTPException(400, "Search query 'q' is required")
+
+        rows = await p.fetch(
+            """SELECT id, date, time, source, user_message, bot_response,
+                      model, duration_sec, tools_used, created_at
+               FROM diary
+               WHERE capsule_id = $1
+                 AND (user_message ILIKE $2 OR bot_response ILIKE $2)
+               ORDER BY date DESC, time DESC
+               LIMIT $3""",
+            capsule_id, f"%{q}%", limit,
+        )
+
+        return [
+            {
+                "id": r["id"],
+                "date": r["date"].isoformat() if hasattr(r["date"], "isoformat") else str(r["date"]),
+                "time": r["time"].isoformat() if hasattr(r["time"], "isoformat") else str(r["time"]),
+                "source": r["source"],
+                "user_message": r["user_message"],
+                "bot_response": r["bot_response"],
+                "model": r["model"],
+                "duration_sec": r["duration_sec"],
+                "tools_used": r["tools_used"] or [],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+
+    # ═══════════════════════════════════════════════════════════
+    # FULL-TEXT SEARCH (messages)
+    # ═══════════════════════════════════════════════════════════
+
+    @app.get("/api/search")
+    async def search_messages(
+        current_user: CurrentUser, request: Request,
+        q: str = "", limit: int = 20,
+    ):
+        """Search across message content in user's conversations."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        if not q.strip():
+            raise HTTPException(400, "Search query 'q' is required")
+
+        rows = await p.fetch(
+            """SELECT m.id AS message_id, m.conversation_id, c.title,
+                      m.role, LEFT(m.content, 200) AS preview, m.created_at
+               FROM messages m
+               JOIN conversations c ON c.id = m.conversation_id
+               WHERE c.user_id = $1 AND m.content ILIKE $2
+               ORDER BY m.created_at DESC
+               LIMIT $3""",
+            current_user["user_id"], f"%{q}%", limit,
+        )
+
+        return [
+            {
+                "message_id": r["message_id"],
+                "conversation_id": r["conversation_id"],
+                "conversation_title": r["title"],
+                "role": r["role"],
+                "content_preview": r["preview"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+
+    # ═══════════════════════════════════════════════════════════
+    # MEMORY & LEARNINGS
+    # ═══════════════════════════════════════════════════════════
+
+    @app.get("/api/memory")
+    async def list_memory(
+        current_user: CurrentUser, request: Request,
+        limit: int = 50, offset: int = 0,
+    ):
+        """List long-term memory entries for the user's capsule."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+
+        rows = await p.fetch(
+            """SELECT id, content, source, score, created_at
+               FROM memory
+               WHERE capsule_id = $1
+               ORDER BY created_at DESC
+               LIMIT $2 OFFSET $3""",
+            capsule_id, limit, offset,
+        )
+
+        return [
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "source": r.get("source", "auto"),
+                "score": r.get("score"),
+                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+            }
+            for r in rows
+        ]
+
+    @app.get("/api/learnings")
+    async def list_learnings(
+        current_user: CurrentUser, request: Request,
+        limit: int = 50,
+    ):
+        """List learnings and corrections for the user's capsule."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+
+        rows = await p.fetch(
+            """SELECT id, content, type, created_at
+               FROM learnings
+               WHERE capsule_id = $1
+               ORDER BY created_at DESC
+               LIMIT $2""",
+            capsule_id, limit,
+        )
+
+        return [
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "type": r.get("type", "learning"),
+                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+            }
+            for r in rows
+        ]
+
+    @app.delete("/api/memory/{memory_id}", status_code=204)
+    async def delete_memory(
+        memory_id: int, current_user: CurrentUser, request: Request,
+    ):
+        """Delete a memory entry (must belong to user's capsule)."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        capsule_id = current_user.get("capsule_id")
+        if not capsule_id:
+            raise HTTPException(400, "No capsule linked")
+
+        result = await p.execute(
+            "DELETE FROM memory WHERE id = $1 AND capsule_id = $2",
+            memory_id, capsule_id,
+        )
+        if result == "DELETE 0":
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory entry not found")
 
     # ═══════════════════════════════════════════════════════════
     # WEBSOCKET — STREAMING CHAT
@@ -1218,15 +1616,13 @@ def create_web_app(
             logger.info("Stream cancelled by user for conv_id=%d", conv_id)
         except Exception as exc:
             logger.error("Stream error conv_id=%d: %s", conv_id, exc, exc_info=True)
-            await session.broadcast({"type": "error", "content": str(exc)})
+            await session.broadcast({"type": "error", "content": "Ошибка обработки. Попробуйте снова."})
 
         duration = time.monotonic() - start_time
 
-        # Process [FILE:] markers — replace with web-accessible URLs
+        # Process [FILE:] markers — replace with web-accessible URLs (only once, for final result)
         if accumulated and _FILE_MARKER_RE.search(accumulated):
             accumulated = _process_file_markers(accumulated)
-            # Send final version with resolved file URLs
-            await session.broadcast({"type": "text", "content": accumulated})
 
         # Save results to DB (regardless of WS connection)
         try:
@@ -1328,13 +1724,13 @@ def create_web_app(
                 try:
                     await websocket.send_json({"type": "ping"})
                     # Check if last pong was recent enough
-                    if time.monotonic() - last_pong > WS_PING_INTERVAL * 3:
+                    if time.monotonic() - last_pong > WS_PING_INTERVAL + WS_PING_TIMEOUT:
                         missed += 1
                         logger.warning(
                             "WS heartbeat: %d missed pongs (conv=%d, user=%d)",
                             missed, conv_id, user_id,
                         )
-                        if missed >= 3:
+                        if missed >= 2:
                             logger.info("WS heartbeat: closing stale connection (conv=%d)", conv_id)
                             await websocket.close(code=4002, reason="Heartbeat timeout")
                             return
@@ -1357,7 +1753,7 @@ def create_web_app(
             )
             if not conv:
                 await websocket.send_json({"type": "error", "content": "Conversation not found"})
-                await websocket.close()
+                await websocket.close(code=4001, reason="Conversation not found")
                 return
 
         # Subscribe to existing session (reconnect scenario)
@@ -1395,7 +1791,7 @@ def create_web_app(
                     continue
 
                 # Rate limit check (per-capsule, per-minute)
-                rl_key = capsule_id or f"user:{user_id}"
+                rl_key = f"user:{user_id}"
                 allowed, wait_sec = _rate_limiter.check(rl_key)
                 if not allowed:
                     await websocket.send_json({
@@ -1423,17 +1819,23 @@ def create_web_app(
                     })
                     continue
 
-                # Voice transcription
+                # Voice transcription — always transcribe voice files
                 VOICE_EXTS = {".webm", ".ogg", ".wav", ".mp3", ".m4a", ".oga"}
                 voice_files = [f for f in files if any(f.lower().endswith(ext) for ext in VOICE_EXTS)]
-                if voice_files and not user_text:
+                if voice_files:
                     await websocket.send_json({"type": "status", "content": "Транскрибирую голос..."})
                     try:
                         from neura.transport.protocol import transcribe_voice
                         transcript = await transcribe_voice(voice_files[0])
-                        if transcript:
-                            user_text = transcript
+                        if transcript and not transcript.startswith("\u274c"):
+                            if user_text:
+                                user_text = f"{user_text}\n\n[Голосовое сообщение]: {transcript}"
+                            else:
+                                user_text = transcript
                             files = [f for f in files if f not in voice_files]
+                            logger.info(f"Voice transcribed: {len(transcript)} chars")
+                        else:
+                            logger.warning(f"Voice transcription empty or failed: {transcript}")
                     except Exception as e:
                         logger.error(f"Voice transcription error: {e}")
                         await websocket.send_json({"type": "error", "content": "Не удалось распознать голос"})
@@ -1565,11 +1967,22 @@ def create_web_app(
                 files = json.loads(files)
             except Exception:
                 files = []
+        # Strip full paths — expose only web-accessible URLs
+        safe_files = []
+        for f in (files or []):
+            if isinstance(f, str):
+                safe_files.append(f"/api/files/serve/{Path(f).name}")
+            elif isinstance(f, dict) and "path" in f:
+                f = dict(f)
+                f["path"] = f"/api/files/serve/{Path(f['path']).name}"
+                safe_files.append(f)
+            else:
+                safe_files.append(f)
         return {
             "id": row["id"],
             "role": row["role"],
             "content": row["content"],
-            "files": files or [],
+            "files": safe_files,
             "model": row["model"],
             "duration_sec": row["duration_sec"],
             "tokens_used": row["tokens_used"],

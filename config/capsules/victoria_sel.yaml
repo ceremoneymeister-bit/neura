@@ -1,5 +1,5 @@
 id: victoria_sel
-name: Нейра — AI-ассистент
+name: Нейра
 owner:
   name: Виктория Сель
   telegram_id: 623494151
@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: victoria_sel/SYSTEM.md
 skills:
 - copywriting
@@ -63,6 +54,7 @@ skills:
 - course-platform-builder
 - telegram-bot-builder
 - skill-creator
+- regru
 memory:
   diary_retention_days: 90
   max_long_term_entries: 100
@@ -76,7 +68,7 @@ memory:
     diary_user_chars: 300
     diary_bot_chars: 400
 internal_groups:
-  - -1003899251313   # Victoria HQ (топики: Контент, Осознания, Рефлексия, Обновления)
+- -1003899251313
 employees:
 - name: Дмитрий Ростовцев
   role: producer

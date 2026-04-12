@@ -1,5 +1,5 @@
 id: sergey_savchuk
-name: Нэйра — AI-ассистент
+name: Нэйра
 owner:
   name: Сергей Савчук
   telegram_id: 5141287871
@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: sergey_savchuk/SYSTEM.md
 skills:
 - copywriting
@@ -49,6 +40,7 @@ skills:
 - booking-scheduler
 - ppt-generator
 - cross-poster
+- google-oauth
 memory:
   diary_retention_days: 90
   max_long_term_entries: 100
@@ -71,5 +63,5 @@ trial:
 subscription:
   plan: monthly
   price_rub: 20000
-  start_date: "2026-04-07"
-  end_date: "2026-05-07"
+  start_date: '2026-04-07'
+  end_date: '2026-05-07'

@@ -23,7 +23,7 @@ SCOPES = "user:inference user:profile user:sessions:claude_code user:file_upload
 
 CREDENTIAL_FILES = [
     Path("/root/.claude/.credentials.json"),        # Дмитрий 20x — основные капсулы
-    Path("/root/.claude-maxim/.credentials.json"),  # Максим 5x — Максим + его команда
+    Path("/root/.claude-maxim/.credentials.json"),  # Максим 20x — Максим + его команда
 ]
 
 LOG_PATH = Path("/root/Antigravity/logs/oauth-refresh.log")

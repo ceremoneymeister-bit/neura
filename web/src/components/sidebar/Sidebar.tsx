@@ -10,6 +10,9 @@ import {
   FolderOpen,
   ChevronDown,
   ChevronRight,
+  Heart,
+  BookOpen,
+  Brain,
 } from 'lucide-react'
 import { type Conversation, listConversations } from '@/api/conversations'
 import { type Project, listProjects } from '@/api/projects'
@@ -272,6 +275,22 @@ export function Sidebar({ onClose }: SidebarProps) {
             )}
           </div>
         )}
+
+        <NavItem
+          icon={<Heart size={18} strokeWidth={1.5} />}
+          label="Автоматизации"
+          onClick={() => { navigate('/heartbeat'); closeMobileOnly(onClose) }}
+        />
+        <NavItem
+          icon={<BookOpen size={18} strokeWidth={1.5} />}
+          label="Дневник"
+          onClick={() => { navigate('/diary'); closeMobileOnly(onClose) }}
+        />
+        <NavItem
+          icon={<Brain size={18} strokeWidth={1.5} />}
+          label="Память"
+          onClick={() => { navigate('/memory'); closeMobileOnly(onClose) }}
+        />
       </nav>
 
       {/* ── Inline search ───────────────────────────────────── */}

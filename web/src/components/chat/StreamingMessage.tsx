@@ -26,7 +26,7 @@ const streamingComponents: Components = {
       return <CodeBlock language={lang} code={String(children).replace(/\n$/, '')} />
     }
     return (
-      <code className="font-mono text-xs bg-[var(--bg-input)] px-1.5 py-0.5 rounded text-[var(--code-inline)] border border-[var(--border)]">
+      <code className="font-mono text-xs bg-[var(--bg-input)] px-1.5 py-0.5 rounded text-[var(--code-inline)] border border-[var(--border)] break-all">
         {children}
       </code>
     )
@@ -67,10 +67,10 @@ export function StreamingMessage({ text, statusText, toolText, onStop }: Streami
       </div>
 
       <div className="flex flex-col gap-2 max-w-[88%] min-w-0 items-start">
-        <div className="px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-sm text-[var(--text-primary)] leading-relaxed w-full">
+        <div className="px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-sm text-[var(--text-primary)] leading-relaxed min-w-0 overflow-hidden">
 
           {isThinking && (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="h-1 w-48 rounded-full overflow-hidden bg-[var(--bg-input)]">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] via-[var(--accent-light)] to-[var(--accent)]"
@@ -80,16 +80,16 @@ export function StreamingMessage({ text, statusText, toolText, onStop }: Streami
                   }}
                 />
               </div>
-              <span className="text-xs text-[var(--text-muted)]">
+              <span className="text-sm font-medium text-[var(--text-secondary)]" style={{ animation: 'pulse 2s ease-in-out infinite' }}>
                 {getStatusLabel(statusText, toolText)}
               </span>
             </div>
           )}
 
           {toolText && text && (
-            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-              <span>{toolText}</span>
+            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-3 px-3 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border)]">
+              <span className="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+              <span className="font-medium text-[var(--text-secondary)]">{toolText}</span>
             </div>
           )}
 

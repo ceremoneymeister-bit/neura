@@ -51,7 +51,7 @@ function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: (id: string) => void
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.95 }}
       transition={{ duration: 0.15 }}
-      className="flex items-start gap-2.5 min-w-[260px] max-w-[360px] rounded-lg bg-[var(--bg-input)] border border-[var(--border)] px-4 py-3 shadow-lg"
+      className="flex items-start gap-2.5 min-w-[260px] max-w-[min(360px,calc(100vw-2rem))] rounded-lg bg-[var(--bg-input)] border border-[var(--border)] px-4 py-3 shadow-lg"
     >
       {icons[t.type]}
       <p className="flex-1 text-sm text-[var(--text-primary)] leading-snug">{t.message}</p>

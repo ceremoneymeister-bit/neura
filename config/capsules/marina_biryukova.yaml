@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: high
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: marina_biryukova/SYSTEM.md
 skills:
 - copywriting
@@ -76,7 +67,7 @@ memory:
     diary_user_chars: 300
     diary_bot_chars: 400
 internal_groups:
-  - -1003870857965   # Марина Бирюкова HQ
+- -1003870857965
 employees:
 - name: Дмитрий Ростовцев
   telegram_id: 1260958591

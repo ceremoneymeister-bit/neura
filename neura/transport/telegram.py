@@ -20,7 +20,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler, ContextTypes,
     MessageHandler, filters,
@@ -90,7 +91,14 @@ class StreamingResponder:
 
     async def start(self) -> None:
         if not self._response_msg:
-            self._response_msg = await self._message.reply_text("🧠 Думаю...")
+            try:
+                self._response_msg = await self._message.reply_text("🧠 Думаю...")
+            except Exception:
+                # Сообщение удалено до ответа — отправляем без reply_to
+                self._response_msg = await self._message.get_bot().send_message(
+                    chat_id=self._message.chat_id,
+                    text="🧠 Думаю...",
+                )
             self._last_edit_time = _time.monotonic()
 
     async def on_text(self, accumulated: str) -> None:
@@ -178,7 +186,11 @@ class TelegramTransport:
         token = capsule.config.bot_token
         self._token_to_capsule[token] = capsule
 
-        app = Application.builder().token(token).build()
+        app = Application.builder().token(token).get_updates_request(
+            HTTPXRequest(connect_timeout=10, read_timeout=15)
+        ).request(
+            HTTPXRequest(connect_timeout=10, read_timeout=30)
+        ).build()
         app.bot_data["capsule"] = capsule
         app.bot_data["transport"] = self
 
@@ -186,8 +198,10 @@ class TelegramTransport:
         app.add_handler(CommandHandler("cancel", self._handle_cancel))
         app.add_handler(CommandHandler("test_onboarding", self._handle_test_onboarding))
         app.add_handler(CommandHandler("connect_google", self._handle_connect_google))
+        app.add_handler(CommandHandler("connect_telegram", self._handle_connect_telegram))
         app.add_handler(CommandHandler("rule", self._handle_rule))
         app.add_handler(CallbackQueryHandler(self._handle_callback, pattern=r"^onb:"))
+        app.add_handler(CallbackQueryHandler(self._handle_action_callback, pattern=r"^action:"))
         app.add_handler(MessageHandler(
             filters.VOICE | filters.AUDIO, self._handle_voice))
         app.add_handler(MessageHandler(
@@ -210,15 +224,22 @@ class TelegramTransport:
             app = self._build_app(capsule)
             self._apps.append(app)
 
+        started = 0
         for app in self._apps:
-            await app.initialize()
-            await app.updater.start_polling(
-                drop_pending_updates=True,
-                allowed_updates=["message", "callback_query"],
-            )
-            await app.start()
+            capsule_id = app.bot_data.get("capsule", {})
+            try:
+                await app.initialize()
+                await app.updater.start_polling(
+                    drop_pending_updates=True,
+                    allowed_updates=["message", "callback_query"],
+                )
+                await app.start()
+                started += 1
+            except Exception as e:
+                logger.error(f"Failed to start bot (will skip): {e}")
+                # Don't crash entire service if one bot fails to initialize
 
-        logger.info(f"Telegram transport started: {len(self._apps)} bot(s)")
+        logger.info(f"Telegram transport started: {started}/{len(self._apps)} bot(s)")
 
     async def stop(self) -> None:
         for app in reversed(self._apps):
@@ -285,10 +306,11 @@ class TelegramTransport:
             return
 
         cap_id = capsule.config.id
+        thread_id = getattr(msg, "message_thread_id", None)
         was_cancelled = await self._queue.cancel_processing(cap_id)
         if was_cancelled:
             # Invalidate session so next message starts fresh
-            await self._session_tracker.invalidate(cap_id, user_id)
+            await self._session_tracker.invalidate(cap_id, user_id, thread_id)
             await msg.reply_text("⏹️ Обработка отменена. Следующее сообщение начнёт новую сессию.")
             logger.info(f"/cancel: processing cancelled for {cap_id} by user {user_id}")
         else:
@@ -430,17 +452,151 @@ class TelegramTransport:
             ])
             await msg.reply_text(
                 "🔗 **Подключение Google**\n\n"
-                "1. Нажми кнопку ниже → авторизуйся в Google\n"
-                "2. После авторизации страница не загрузится — это нормально\n"
-                "3. Скопируй URL из адресной строки браузера\n"
-                "4. Отправь его сюда командой:\n"
-                "`/connect_google <скопированный URL>`",
+                "1. Нажми кнопку ниже\n"
+                "2. Google покажет предупреждение — это нормально (приложение наше, просто не прошло проверку Google)\n"
+                "3. Нажми «Дополнительные» → «Перейти на сайт (небезопасно)»\n"
+                "4. Выбери свой Google-аккаунт и разреши доступ\n"
+                "5. Страница не загрузится — это ОК\n"
+                "6. Скопируй URL из адресной строки\n"
+                "7. Отправь сюда: `/connect_google <URL>`",
                 reply_markup=keyboard,
                 parse_mode="Markdown",
             )
         except Exception as e:
             logger.error(f"Google OAuth URL generation failed: {e}", exc_info=True)
             await msg.reply_text(f"❌ Ошибка генерации ссылки: {e}")
+
+    async def _handle_connect_telegram(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /connect_telegram — QR-code userbot auth (reusable, not just onboarding)."""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from neura.provisioning.userbot_connect import UserbotConnector
+
+        capsule: Capsule = context.bot_data["capsule"]
+        msg = update.effective_message
+        if not msg:
+            return
+        user_id = update.effective_user.id
+
+        if not capsule.is_employee(user_id):
+            return
+
+        cap_id = capsule.config.id
+        home = capsule.config.home_dir or f"/tmp/neura-homes/{cap_id}"
+
+        # Check if already authorized
+        session_path = Path(home) / f"{cap_id}_userbot.session"
+        if session_path.exists():
+            from telethon import TelegramClient
+            client = TelegramClient(
+                str(session_path).replace(".session", ""),
+                33869550, "bcc80776767204e74d728936e1e124a3",
+            )
+            try:
+                await client.connect()
+                if await client.is_user_authorized():
+                    me = await client.get_me()
+                    await client.disconnect()
+                    await msg.reply_text(
+                        f"✅ Telegram уже подключён!\n\n"
+                        f"Авторизован как: {me.first_name} (ID: {me.id})\n\n"
+                        f"Если хотите переподключить — удалю старую сессию и создам новую.\n"
+                        f"Отправьте /connect_telegram force",
+                    )
+                    return
+                await client.disconnect()
+            except Exception:
+                pass
+
+        # Force reconnect — delete stale session
+        text_cmd = (msg.text or "").strip()
+        if "force" in text_cmd.lower() and session_path.exists():
+            session_path.unlink(missing_ok=True)
+            journal = Path(f"{session_path}-journal")
+            journal.unlink(missing_ok=True)
+            logger.info(f"[{cap_id}] Deleted stale session for reconnect")
+
+        # Start QR flow
+        connector = UserbotConnector(home, cap_id)
+        result = await connector.request_qr()
+
+        if result.get("error"):
+            await msg.reply_text(f"❌ {result['error']}")
+            return
+
+        qr_path = result["qr_path"]
+
+        # Store connector for background wait
+        if not hasattr(self, "_tg_connectors"):
+            self._tg_connectors = {}
+        self._tg_connectors[(cap_id, user_id)] = connector
+
+        # Send QR image
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Обновить QR", callback_data="onb:tgconnect_refresh")],
+            [InlineKeyboardButton("❌ Отмена", callback_data="onb:tgconnect_cancel")],
+        ])
+        try:
+            with open(qr_path, "rb") as f:
+                await msg.reply_photo(
+                    f,
+                    caption=(
+                        "📲 Сканируйте QR-код для подключения Telegram:\n\n"
+                        "1️⃣ Откройте Telegram на телефоне\n"
+                        "2️⃣ Настройки → Устройства → Привязать устройство\n"
+                        "3️⃣ Наведите камеру на QR-код\n\n"
+                        "⏳ QR действует 2 минуты"
+                    ),
+                    reply_markup=keyboard,
+                )
+        except Exception:
+            await msg.reply_text(
+                "📲 QR-код сгенерирован, но не удалось отправить картинку.\n"
+                "Попробуйте /connect_telegram ещё раз.",
+            )
+            return
+
+        # Background wait for scan (with hard timeout to prevent blocking)
+        async def _wait_and_notify():
+            needs_cleanup = True
+            try:
+                scan_result = await connector.wait_for_qr_scan(timeout=120)
+
+                if scan_result.get("ok"):
+                    await context.bot.send_message(
+                        msg.chat_id,
+                        f"✅ Telegram подключён!\n\n"
+                        f"Авторизован как: {scan_result.get('name', '?')} "
+                        f"(ID: {scan_result.get('user_id', '?')})\n\n"
+                        f"Теперь я могу отправлять сообщения от вашего имени.",
+                    )
+                    return
+
+                if scan_result.get("2fa"):
+                    # Keep connector alive for 2FA password input
+                    needs_cleanup = False
+                    self._tg_connectors[(cap_id, user_id)] = connector
+                    if not hasattr(self, "_tg_2fa_pending"):
+                        self._tg_2fa_pending = {}
+                    self._tg_2fa_pending[(cap_id, user_id)] = connector
+                    await context.bot.send_message(
+                        msg.chat_id,
+                        "🔐 QR отсканирован! У вас включена двухфакторная аутентификация.\n\n"
+                        "Отправьте пароль 2FA в этот чат:",
+                    )
+                    return
+
+                # Expired or error — just notify, no recreate (prevents blocking)
+                await context.bot.send_message(
+                    msg.chat_id,
+                    "⏳ QR истёк (2 минуты). Отправьте /connect_telegram чтобы получить новый.",
+                )
+            except Exception as e:
+                logger.error(f"[{cap_id}] connect_telegram wait error: {e}", exc_info=True)
+            finally:
+                if needs_cleanup:
+                    await connector.cleanup()
+
+        asyncio.create_task(_wait_and_notify())
 
     async def _handle_rule(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /rule command — add user-defined rule to CLAUDE.md."""
@@ -492,6 +648,31 @@ class TelegramTransport:
         await query.answer()
 
         data = query.data
+
+        # /connect_telegram callbacks (outside onboarding)
+        if data == "onb:tgconnect_refresh":
+            cap_id = capsule.config.id
+            connector = self._tg_connectors.get((cap_id, user_id)) if hasattr(self, "_tg_connectors") else None
+            if connector:
+                new_qr = await connector.recreate_qr()
+                if new_qr.get("ok"):
+                    try:
+                        with open(new_qr["qr_path"], "rb") as f:
+                            await query.message.reply_photo(f, caption="🔄 QR обновлён. Сканируйте заново (ещё 2 минуты):")
+                    except Exception:
+                        pass
+            else:
+                await query.message.reply_text("❌ Сессия потеряна. Отправьте /connect_telegram заново.")
+            return
+
+        if data == "onb:tgconnect_cancel":
+            cap_id = capsule.config.id
+            connector = self._tg_connectors.pop((cap_id, user_id), None) if hasattr(self, "_tg_connectors") else None
+            if connector:
+                await connector.cleanup()
+            await query.message.reply_text("❌ Подключение отменено.")
+            return
+
         text, keyboard, action = await self._onboarding.handle_callback(capsule, user_id, data)
 
         if not text:
@@ -564,6 +745,55 @@ class TelegramTransport:
         else:  # "reply"
             await query.message.reply_text(text, reply_markup=keyboard)
 
+    async def _handle_action_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle action confirmation callbacks (action:confirm / action:reject)."""
+        query = update.callback_query
+        if not query or not query.data:
+            return
+
+        await query.answer()
+
+        capsule: Capsule = context.bot_data["capsule"]
+        data = query.data  # "action:confirm" or "action:reject"
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+
+        user_id = update.effective_user.id
+        cap_id = capsule.config.id
+        thread_id = getattr(query.message, "message_thread_id", None)
+
+        # Remove inline buttons from the original message
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+
+        if action == "confirm":
+            # Send confirmation back to Claude session via resume
+            follow_up = IncomingMessage(
+                capsule_id=cap_id, user_id=user_id,
+                user_name=update.effective_user.first_name or "",
+                text="Подтверждено. Выполняй действие.",
+                thread_id=thread_id,
+                chat_id=query.message.chat_id,
+            )
+            await self._process_message(query.message, capsule, follow_up)
+        else:
+            # Rejected — notify user, send cancellation to Claude session
+            await query.message.reply_text(
+                "❌ Действие отменено.",
+                message_thread_id=thread_id,
+            )
+            # Also inform Claude so it knows the action was rejected
+            follow_up = IncomingMessage(
+                capsule_id=cap_id, user_id=user_id,
+                user_name=update.effective_user.first_name or "",
+                text="Отменено пользователем. Не выполняй действие.",
+                thread_id=thread_id,
+                chat_id=query.message.chat_id,
+            )
+            await self._process_message(query.message, capsule, follow_up)
+
     async def _handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.effective_message
         if not msg or not msg.text:
@@ -576,6 +806,25 @@ class TelegramTransport:
         user_id = user.id
         logger.info(f"Text from user_id={user_id}, name={user.first_name}, text={msg.text[:200]!r}")
 
+        # /connect_telegram 2FA intercept
+        cap_id = capsule.config.id
+        if hasattr(self, "_tg_2fa_pending") and (cap_id, user_id) in self._tg_2fa_pending:
+            connector = self._tg_2fa_pending.pop((cap_id, user_id))
+            try:
+                result = await connector.sign_in_2fa(msg.text.strip())
+                if result.get("ok"):
+                    await msg.reply_text(
+                        f"✅ Telegram подключён!\n\n"
+                        f"Авторизован как: {result.get('name', '?')} "
+                        f"(ID: {result.get('user_id', '?')})\n\n"
+                        f"Теперь я могу отправлять сообщения от вашего имени.",
+                    )
+                else:
+                    await msg.reply_text(f"❌ {result.get('error', 'Ошибка 2FA')}. Попробуйте /connect_telegram заново.")
+            except Exception as e:
+                await msg.reply_text(f"❌ Ошибка: {e}. Попробуйте /connect_telegram заново.")
+            return
+
         # Onboarding intercept — BEFORE employee check
         if self._onboarding:
             try:
@@ -584,7 +833,7 @@ class TelegramTransport:
                     text, keyboard = result
                     await msg.reply_text(text, reply_markup=keyboard)
                     # Save onboarding interaction to diary
-                    incoming = IncomingMessage(text=msg.text.strip(), source="telegram", thread_id=None)
+                    incoming = IncomingMessage(capsule_id=capsule.config.id, user_id=user_id, user_name=msg.from_user.first_name or "", text=msg.text.strip(), source="telegram", thread_id=None)
                     await self._save_diary(capsule, incoming, text, ["onboarding"])
                     return
             except Exception as e:
@@ -614,7 +863,7 @@ class TelegramTransport:
                 if not mentioned and msg.reply_to_message and msg.reply_to_message.from_user:
                     mentioned = msg.reply_to_message.from_user.is_bot
                 if not mentioned:
-                    logger.info(f"Group msg from {user_id} ignored — bot not mentioned (chat={msg.chat.title!r})")
+                    logger.info(f"Group msg from {user_id} ignored — bot not mentioned (chat={msg.chat.title!r}, chat_id={msg.chat.id})")
                     return
 
         if capsule.is_trial_expired():
@@ -707,7 +956,7 @@ class TelegramTransport:
         # Group chat: voice messages processed only in internal groups
         if msg.chat.type in ("group", "supergroup"):
             if msg.chat.id not in capsule.config.internal_groups:
-                logger.info(f"Voice in group from {user_id} ignored — not internal group (chat={msg.chat.title!r})")
+                logger.info(f"Voice in group from {user_id} ignored — not internal group (chat={msg.chat.title!r}, chat_id={msg.chat.id})")
                 return
 
         cap_id = capsule.config.id
@@ -935,12 +1184,35 @@ class TelegramTransport:
         extracted_text = None
         ext_lower = ext.lower()
         if ext_lower == ".doc":
-            await msg.reply_text(
-                "⚠️ Файл в старом формате Word (.doc). "
-                "Пожалуйста, пересохраните его как .docx "
-                "(Файл → Сохранить как → DOCX) и отправьте заново."
-            )
-            return
+            # Auto-convert .doc → .docx via LibreOffice
+            try:
+                import subprocess
+                conv_dir = os.path.dirname(tmp_path)
+                conv_result = subprocess.run(
+                    ["libreoffice", "--headless", "--convert-to", "docx", "--outdir", conv_dir, tmp_path],
+                    capture_output=True, text=True, timeout=30,
+                )
+                docx_path = tmp_path.rsplit(".", 1)[0] + ".docx"
+                if os.path.exists(docx_path):
+                    tmp_path = docx_path
+                    ext_lower = ".docx"
+                    logger.info(f"Auto-converted .doc → .docx: {docx_path}")
+                else:
+                    logger.warning(f"LibreOffice conversion failed: {conv_result.stderr[:200]}")
+                    await msg.reply_text(
+                        "⚠️ Файл в старом формате Word (.doc). "
+                        "Не удалось конвертировать автоматически. "
+                        "Пожалуйста, пересохраните как .docx и отправьте заново."
+                    )
+                    return
+            except Exception as e:
+                logger.warning(f".doc auto-convert failed: {e}")
+                await msg.reply_text(
+                    "⚠️ Файл в старом формате Word (.doc). "
+                    "Пожалуйста, пересохраните его как .docx "
+                    "(Файл → Сохранить как → DOCX) и отправьте заново."
+                )
+                return
         if ext_lower not in (".pdf",):
             try:
                 from markitdown import MarkItDown
@@ -996,9 +1268,11 @@ class TelegramTransport:
         engine_error: str | None = None
         result_session_id: str = ""
 
+        thread_id = incoming.thread_id
+
         try:
-            # 1. Check for existing session to resume
-            existing_session = await self._session_tracker.get(cap_id, user_id)
+            # 1. Check for existing session to resume (per-topic in forum groups)
+            existing_session = await self._session_tracker.get(cap_id, user_id, thread_id)
             engine_cfg = capsule.get_engine_config()
 
             # Apply !directives to engine config (model, effort, tools)
@@ -1086,10 +1360,10 @@ class TelegramTransport:
             # 2.0 Save session_id for next message (or invalidate on error)
             if engine_error and existing_session:
                 # Resume failed — invalidate and will start fresh next time
-                await self._session_tracker.invalidate(cap_id, user_id)
+                await self._session_tracker.invalidate(cap_id, user_id, thread_id)
                 logger.info(f"[{cap_id}] Session invalidated after error, will start fresh next time")
             elif result_session_id:
-                await self._session_tracker.set(cap_id, user_id, result_session_id)
+                await self._session_tracker.set(cap_id, user_id, result_session_id, thread_id)
                 logger.info(f"[{cap_id}] Session saved: {result_session_id[:12]}…")
 
             # 2a. Intercept engine errors — never show raw API errors to user
@@ -1203,7 +1477,7 @@ class TelegramTransport:
         except Exception as e:
             logger.error(f"Processing error for {cap_id}: {e}", exc_info=True)
             # Invalidate session on crash — next message will start fresh
-            await self._session_tracker.invalidate(cap_id, user_id)
+            await self._session_tracker.invalidate(cap_id, user_id, thread_id)
             # Metrics (error)
             if self._metrics:
                 duration = _time.monotonic() - start_time
@@ -1221,8 +1495,8 @@ class TelegramTransport:
             except Exception:
                 pass
         finally:
-            # Cleanup temp file
-            if incoming.file_path:
+            # Cleanup temp file (only /tmp/, never persistent uploads/)
+            if incoming.file_path and incoming.file_path.startswith("/tmp/"):
                 try:
                     os.unlink(incoming.file_path)
                 except Exception:
@@ -1299,6 +1573,24 @@ class TelegramTransport:
                     pass
 
         if not response.text or files_only:
+            return
+
+        # 1b. Action confirmation with inline buttons
+        if response.pending_action:
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Да", callback_data="action:confirm"),
+                InlineKeyboardButton("❌ Нет", callback_data="action:reject"),
+            ]])
+            try:
+                await msg.reply_text(
+                    response.text, reply_markup=keyboard,
+                    message_thread_id=thread_id, parse_mode="Markdown",
+                )
+            except Exception:
+                await msg.reply_text(
+                    response.text, reply_markup=keyboard,
+                    message_thread_id=thread_id,
+                )
             return
 
         # 2. Telegraph for long messages

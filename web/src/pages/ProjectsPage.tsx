@@ -133,8 +133,15 @@ export function ProjectsPage() {
 
         {/* Grid */}
         {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="inline-block rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin w-6 h-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-xl border border-[var(--border)] p-4">
+                <div className="skeleton h-7 w-7 rounded-lg mb-3" />
+                <div className="skeleton h-4 w-3/4 rounded mb-2" />
+                <div className="skeleton h-3 w-full rounded mb-1.5" />
+                <div className="skeleton h-3 w-1/2 rounded" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

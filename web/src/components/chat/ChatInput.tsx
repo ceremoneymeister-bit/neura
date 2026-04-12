@@ -135,23 +135,43 @@ export function ChatInput({
     }
   }, [])
 
+  const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+
   const uploadFiles = useCallback(async (selected: File[]) => {
     if (selected.length === 0) return
+
+    // Client-side size check
+    const oversized = selected.filter((f) => f.size > MAX_FILE_SIZE)
+    if (oversized.length > 0) {
+      const names = oversized.map((f) => f.name).join(', ')
+      showError(`Файлы превышают 100MB: ${names}`)
+      selected = selected.filter((f) => f.size <= MAX_FILE_SIZE)
+      if (selected.length === 0) return
+    }
+
     const controller = new AbortController()
     uploadAbortRef.current = controller
     setIsUploading(true)
     try {
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         selected.map((f) => uploadFile(f, controller.signal)),
       )
-      setAttachedFiles((prev) => [
-        ...prev,
-        ...results.map((r) => ({ name: r.filename, path: r.path })),
-      ])
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        console.error('Upload failed:', err)
-        showError('Не удалось загрузить файл')
+      const succeeded: AttachedFile[] = []
+      const failedNames: string[] = []
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          succeeded.push({ name: r.value.filename, path: r.value.path })
+        } else {
+          if ((r.reason as Error)?.name !== 'AbortError') {
+            failedNames.push(selected[i].name)
+          }
+        }
+      })
+      if (succeeded.length > 0) {
+        setAttachedFiles((prev) => [...prev, ...succeeded])
+      }
+      if (failedNames.length > 0) {
+        showError(`Не удалось загрузить: ${failedNames.join(', ')}`)
       }
     } finally {
       uploadAbortRef.current = null
@@ -233,7 +253,7 @@ export function ChatInput({
 
   return (
     <div
-      className="relative px-4 pb-3 pt-2 shrink-0 max-w-3xl mx-auto w-full"
+      className="relative px-4 pb-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shrink-0 max-w-3xl mx-auto w-full"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -249,7 +269,7 @@ export function ChatInput({
 
       {/* File chips */}
       {attachedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
+        <div className="flex flex-wrap gap-1.5 mb-2 max-h-[120px] overflow-y-auto">
           {attachedFiles.map((f, i) => (
             <div
               key={i}

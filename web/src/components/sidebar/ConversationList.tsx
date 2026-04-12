@@ -271,8 +271,8 @@ export function ConversationList({
           <div
             className="fixed z-50 min-w-[168px] bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-2xl py-1 text-xs"
             style={{
-              left: Math.min(ctxMenu.x, window.innerWidth - 190),
-              top: Math.min(ctxMenu.y, window.innerHeight - 220),
+              left: Math.max(8, Math.min(ctxMenu.x, window.innerWidth - 190)),
+              top: Math.max(8, Math.min(ctxMenu.y, window.innerHeight - 280)),
             }}
           >
             <CtxItem

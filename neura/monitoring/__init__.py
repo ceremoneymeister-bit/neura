@@ -4,7 +4,7 @@ Usage in app.py:
     monitoring = await setup_monitoring(db.pool, cache.redis, capsules)
     await monitoring["health"].start()
 """
-from neura.monitoring.alerts import AlertSender, SERVICE_START, SERVICE_STOP
+from neura.monitoring.alerts import AlertSender, SERVICE_START, SERVICE_STOP, HEARTBEAT_FAIL, SERVICE_CRASH
 from neura.monitoring.health import HealthMonitor, HealthStatus
 from neura.monitoring.metrics import MetricsCollector
 

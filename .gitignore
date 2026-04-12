@@ -1,4 +1,7 @@
+# Secrets
 .env
+
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -6,3 +9,19 @@ __pycache__/
 dist/
 build/
 .venv/
+.mypy_cache/
+
+# Runtime data (per-capsule, not platform code)
+homes/
+data/vectordb/
+logs/
+skills/
+
+# Backups and temp
+*.bak*
+*.tmp
+/tmp/
+
+# Editor
+.vscode/
+*.swp

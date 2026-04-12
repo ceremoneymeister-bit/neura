@@ -1,5 +1,5 @@
 id: yana_berezhnaya
-name: Нейра — AI-ассистент
+name: Нейра
 owner:
   name: Яна Бережная
   telegram_id: 150716139
@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: yana_berezhnaya/SYSTEM.md
 skills:
 - copywriting
@@ -76,7 +67,8 @@ memory:
     diary_user_chars: 300
     diary_bot_chars: 400
 internal_groups:
-  - -1002930580025   # БЕРЕЖНАЯ ЙОГА (топики: Йога, Дыхательные, МФР, Быстрая йога, Аюрведа)
+- -1002930580025   # БЕРЕЖНАЯ ЙОГА с Яной Бережной
+- -1003794301621   # Нейра — рабочее пространство Яны (forum, topics)
 employees:
 - name: Дмитрий Ростовцев
   role: producer

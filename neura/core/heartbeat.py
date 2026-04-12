@@ -154,7 +154,7 @@ class HeartbeatEngine:
         Args:
             redis_client: Redis async client for dedup state.
             send_callback: async fn(capsule_id, telegram_id, message) -> None
-            task_callback: async fn(capsule_id, telegram_id, prompt) -> None
+            task_callback: async fn(capsule_id, telegram_id, task_name, prompt) -> None
                            Runs prompt through engine and sends result.
         """
         self._redis = redis_client
@@ -188,7 +188,7 @@ class HeartbeatEngine:
         logger.info("HeartbeatEngine stopped")
 
     async def _run_loop(self) -> None:
-        await asyncio.sleep(120)  # initial delay
+        await asyncio.sleep(30)  # initial delay (short — fast user task pickup)
         while True:
             try:
                 await self._check_all()
@@ -232,7 +232,7 @@ class HeartbeatEngine:
                 # Fire!
                 if task.task_type == "task" and self._run_task:
                     await self._run_task(
-                        task.capsule_id, task.owner_telegram_id, task.message
+                        task.capsule_id, task.owner_telegram_id, task.name, task.message
                     )
                 else:
                     await self._send(
@@ -288,7 +288,10 @@ class HeartbeatEngine:
                     cfg_path = Path(f"/opt/neura-v2/config/capsules/{capsule_id}.yaml")
                     if cfg_path.exists():
                         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+                        # telegram_id can be top-level or nested under owner
                         owner_id = cfg.get("telegram_id", 0)
+                        if not owner_id:
+                            owner_id = cfg.get("owner", {}).get("telegram_id", 0)
                     if not owner_id:
                         continue
 

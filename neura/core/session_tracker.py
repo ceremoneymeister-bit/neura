@@ -1,7 +1,7 @@
-"""SessionTracker — maps (capsule_id, user_id) → Claude CLI session_id.
+"""SessionTracker — maps (capsule_id, user_id, thread_id) → Claude CLI session_id.
 
-Keeps one active session per user per capsule.  Stale sessions (older than
-TTL) are automatically evicted so Claude starts fresh.
+Keeps one active session per user per capsule per forum topic.  Stale sessions
+(older than TTL) are automatically evicted so Claude starts fresh.
 
 Thread-safe: uses a simple dict + asyncio lock.
 """
@@ -33,12 +33,14 @@ class SessionTracker:
         self._lock = asyncio.Lock()
 
     @staticmethod
-    def _key(capsule_id: str, user_id: int) -> str:
+    def _key(capsule_id: str, user_id: int, thread_id: int | None = None) -> str:
+        if thread_id:
+            return f"{capsule_id}:{user_id}:{thread_id}"
         return f"{capsule_id}:{user_id}"
 
-    async def get(self, capsule_id: str, user_id: int) -> str | None:
+    async def get(self, capsule_id: str, user_id: int, thread_id: int | None = None) -> str | None:
         """Get active session_id, or None if expired/missing."""
-        key = self._key(capsule_id, user_id)
+        key = self._key(capsule_id, user_id, thread_id)
         async with self._lock:
             entry = self._sessions.get(key)
             if entry is None:
@@ -50,11 +52,11 @@ class SessionTracker:
                 return None
             return entry.session_id
 
-    async def set(self, capsule_id: str, user_id: int, session_id: str) -> None:
-        """Store or update session_id for a user."""
+    async def set(self, capsule_id: str, user_id: int, session_id: str, thread_id: int | None = None) -> None:
+        """Store or update session_id for a user (per topic in forum groups)."""
         if not session_id:
             return
-        key = self._key(capsule_id, user_id)
+        key = self._key(capsule_id, user_id, thread_id)
         now = time.monotonic()
         async with self._lock:
             existing = self._sessions.get(key)
@@ -71,9 +73,9 @@ class SessionTracker:
             if len(self._sessions) > MAX_SESSIONS:
                 self._evict_oldest()
 
-    async def invalidate(self, capsule_id: str, user_id: int) -> None:
+    async def invalidate(self, capsule_id: str, user_id: int, thread_id: int | None = None) -> None:
         """Remove session (e.g. after error that requires fresh start)."""
-        key = self._key(capsule_id, user_id)
+        key = self._key(capsule_id, user_id, thread_id)
         async with self._lock:
             self._sessions.pop(key, None)
 

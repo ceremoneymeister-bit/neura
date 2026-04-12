@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Download } from 'lucide-react'
 import type { Message } from '@/api/conversations'
 import { getMessages, updateConversation, listConversations } from '@/api/conversations'
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -24,6 +24,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [showScrollBottom, setShowScrollBottom] = useState(false)
   const [autoTitleDone, setAutoTitleDone] = useState(false)
   const [conversationModel, setConversationModel] = useState<string | undefined>(undefined)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const PAGE_SIZE = 50
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastUserTextRef = useRef<string>('')
@@ -31,10 +35,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const queuedMessageRef = useRef<{ text: string; files: string[]; model?: string } | null>(null)
   const sendRef = useRef<(text: string, files: string[], model?: string) => void>(() => {})
   const convId = parseInt(conversationId, 10)
+  const convIdRef = useRef(convId)
+  convIdRef.current = convId
 
   // ── WebSocket message handler ─────────────────────────────────
 
   const handleMessage = useCallback((chunk: WsChunk) => {
+    // Ignore chunks arriving after user switched to a different conversation
+    if (convIdRef.current !== convId) return
     switch (chunk.type) {
       case 'status':
         setStatusText(chunk.content)
@@ -59,7 +67,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         setError(chunk.content)
         break
     }
-  }, [])
+  }, [convId])
 
   const handleDone = useCallback((final: WsChunk) => {
     const assistantMsg: Message = {
@@ -155,6 +163,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setError(null)
     setAutoTitleDone(false)
     setShowScrollBottom(false)
+    setHasMore(false)
+    setLoadingMore(false)
     pendingSentRef.current = false
 
     if (isNaN(convId)) return
@@ -169,9 +179,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
       })
       .catch(() => {})
 
-    getMessages(convId)
+    getMessages(convId, PAGE_SIZE)
       .then((msgs) => {
         setMessages(msgs)
+        setHasMore(msgs.length >= PAGE_SIZE)
         if (msgs.length > 0) {
           setAutoTitleDone(true)
           // Emit first user message as title for top bar
@@ -186,6 +197,36 @@ export function ChatView({ conversationId }: ChatViewProps) {
       .finally(() => setIsLoading(false))
   }, [convId])
 
+  // ── Clear streaming state on disconnect ─────────────────────────
+
+  useEffect(() => {
+    if ((wsStatus === 'disconnected' || wsStatus === 'error') && isStreaming) {
+      // Save partial text as a message if any
+      if (streamingText) {
+        const partialMsg: Message = {
+          id: Date.now(),
+          role: 'assistant',
+          content: streamingText + '\n\n*(соединение потеряно)*',
+          files: [],
+          model: null,
+          duration_sec: null,
+          tokens_used: null,
+          created_at: new Date().toISOString(),
+        }
+        setMessages((prev) => [...prev, partialMsg])
+      }
+      setIsStreaming(false)
+      setStreamingText('')
+      setStatusText(null)
+      setToolText(null)
+      if (wsStatus === 'disconnected') {
+        setError('Соединение потеряно. Переподключаюсь...')
+      } else {
+        setError('Ошибка соединения. Обновите страницу.')
+      }
+    }
+  }, [wsStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Auto-dismiss error after 8s ─────────────────────────────────
 
   useEffect(() => {
@@ -194,36 +235,72 @@ export function ChatView({ conversationId }: ChatViewProps) {
     return () => clearTimeout(timer)
   }, [error])
 
+  // ── Load more (older messages) ──────────────────────────────────
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || isNaN(convId)) return
+    setLoadingMore(true)
+    const el = scrollRef.current
+    const prevScrollHeight = el?.scrollHeight ?? 0
+    try {
+      const older = await getMessages(convId, PAGE_SIZE, messages.length)
+      if (older.length < PAGE_SIZE) setHasMore(false)
+      if (older.length > 0) {
+        setMessages((prev) => [...older, ...prev])
+        // Preserve scroll position after prepending
+        requestAnimationFrame(() => {
+          if (el) {
+            el.scrollTop = el.scrollHeight - prevScrollHeight
+          }
+        })
+      }
+    } catch {
+      setError('Не удалось загрузить сообщения')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, convId, messages.length])
+
   // ── Auto-scroll ────────────────────────────────────────────────
 
   const userScrolledUpRef = useRef(false)
+  const isStreamingRef = useRef(false)
+  isStreamingRef.current = isStreaming
+
+  const doScroll = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (!userScrolledUpRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      doScroll()
     }
-  }, [messages])
+  }, [messages, doScroll])
 
   useEffect(() => {
     if (isStreaming && !userScrolledUpRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      doScroll()
     }
-  }, [streamingText, isStreaming])
+  }, [streamingText, isStreaming, doScroll])
 
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    userScrolledUpRef.current = distFromBottom > 120
-    setShowScrollBottom(distFromBottom > 120)
+    // During streaming, don't mark as "scrolled up" from layout jumps
+    if (isStreamingRef.current && distFromBottom < 150) return
+    userScrolledUpRef.current = distFromBottom > 50
+    setShowScrollBottom(distFromBottom > 50)
   }
 
   const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
     userScrolledUpRef.current = false
     setShowScrollBottom(false)
+    doScroll()
   }
 
   // ── Send message ──────────────────────────────────────────────
@@ -268,9 +345,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
       document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title } }))
     }
 
-    setIsStreaming(true)
-    setStatusText('Думаю...')
-    send(text, files, model)
+    const sent = send(text, files, model)
+    if (sent) {
+      setIsStreaming(true)
+      setStatusText('Думаю...')
+    } else {
+      setError('Нет соединения. Переподключаюсь...')
+    }
   }, [isStreaming, autoTitleDone, convId, send])
 
   // ── Regenerate last response ──────────────────────────────────
@@ -314,6 +395,25 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setToolText(null)
   }, [sendCancel, streamingText])
 
+  // ── Export conversation ────────────────────────────────────────
+
+  const handleExport = useCallback(() => {
+    if (messages.length === 0) return
+    const lines = messages.map((m) => {
+      const role = m.role === 'user' ? '\u{1F464} \u0412\u044B' : '\u{1F916} \u041D\u044D\u0439\u0440\u0430'
+      const time = m.created_at ? new Date(m.created_at).toLocaleString('ru-RU') : ''
+      return `### ${role}${time ? ` (${time})` : ''}\n\n${m.content}\n`
+    })
+    const md = `# \u0414\u0438\u0430\u043B\u043E\u0433\n\n\u042D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E: ${new Date().toLocaleString('ru-RU')}\n\n---\n\n${lines.join('\n---\n\n')}`
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-${conversationId}-${Date.now()}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [messages, conversationId])
+
   // ── Render ────────────────────────────────────────────────────
 
   return (
@@ -325,6 +425,33 @@ export function ChatView({ conversationId }: ChatViewProps) {
         className="flex-1 overflow-y-auto"
       >
         <div className="max-w-3xl mx-auto w-full">
+          {/* Load more button */}
+          {hasMore && (
+            <div className="flex justify-center py-3">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors px-4 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 disabled:opacity-50"
+              >
+                {loadingMore ? 'Загрузка...' : 'Загрузить ранние сообщения'}
+              </button>
+            </div>
+          )}
+
+          {/* Export button */}
+          {messages.length > 0 && (
+            <div className="flex justify-end px-4 pt-2">
+              <button
+                onClick={handleExport}
+                title="\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0434\u0438\u0430\u043B\u043E\u0433\u0430"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors px-3 py-1.5 rounded-lg hover:bg-[var(--bg-hover)] flex items-center gap-1.5"
+              >
+                <Download size={12} />
+                Экспорт
+              </button>
+            </div>
+          )}
+
           {/* Empty chat — show suggestions */}
           {messages.length === 0 && !isLoading && !isStreaming && (
             <div className="flex items-center justify-center py-16 px-4">

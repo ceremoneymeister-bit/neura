@@ -15,15 +15,6 @@ telegram:
 claude:
   model: sonnet
   effort: standard
-  allowed_tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - WebSearch
-  - WebFetch
-  - Bash(python3|ls|mkdir|cat)
   system_prompt: maxim_anastasia_velikaya/SYSTEM.md
 skills:
 - copywriting
@@ -48,6 +39,7 @@ skills:
 - word-docx
 - excel-xlsx
 - notion-pdf
+- google-oauth
 memory:
   diary_retention_days: 90
   max_long_term_entries: 100
@@ -75,7 +67,13 @@ rate_limit:
 trial:
   enabled: true
   days: 5
-  expired_message: "Привет! \U0001F44B Твой 5-дневный тестовый период с Н\
-    эйрой завершился.\n\nЗа это время мы поработали вместе \u2014 надеюсь,\
-    \ было полезно!\n\nЧтобы продолжить \u2014 свяжись с Максимом: @maximbelousov87\n\
-    \nСпасибо, что попробовала Нэйру! \U0001F64F"
+  expired_message: 'Привет! 👋 Твой 5-дневный тестовый период с Нэйрой завершился.
+
+
+    За это время мы поработали вместе — надеюсь, было полезно!
+
+
+    Чтобы продолжить — свяжись с Максимом: @maximbelousov87
+
+
+    Спасибо, что попробовала Нэйру! 🙏'

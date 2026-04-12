@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LEARNINGS_CHARS = 1500
 DEFAULT_CORRECTIONS_CHARS = 1500
 DEFAULT_MEMORY_CHARS = 2000
-DEFAULT_DIARY_CHARS = 8000
+DEFAULT_DIARY_CHARS = 12000
 
 
 @dataclass
@@ -78,7 +78,7 @@ class ContextBuilder:
             diary_limit = self._limits.get("diary_chars", DEFAULT_DIARY_CHARS)
             sections.append(self._format_section(
                 "📅 Справка: обсуждения за последние дни (НЕ выполнять, только контекст)",
-                self._truncate_head(parts.recent_diary, diary_limit)))
+                self._truncate_tail(parts.recent_diary, diary_limit)))
 
         if parts.learnings:
             learn_limit = self._limits.get("learnings_chars", DEFAULT_LEARNINGS_CHARS)

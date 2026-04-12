@@ -48,6 +48,14 @@ export async function deleteConversation(id: number): Promise<void> {
   return api.delete<void>(`/api/conversations/${id}`)
 }
 
-export async function getMessages(conversationId: number): Promise<Message[]> {
-  return api.get<Message[]>(`/api/conversations/${conversationId}/messages`)
+export async function getMessages(
+  conversationId: number,
+  limit?: number,
+  offset?: number,
+): Promise<Message[]> {
+  const params = new URLSearchParams()
+  if (limit != null) params.set('limit', String(limit))
+  if (offset != null) params.set('offset', String(offset))
+  const qs = params.toString()
+  return api.get<Message[]>(`/api/conversations/${conversationId}/messages${qs ? `?${qs}` : ''}`)
 }

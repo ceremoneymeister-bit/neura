@@ -12,6 +12,9 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { HeartbeatPage } from '@/pages/HeartbeatPage'
+import { DiaryPage } from '@/pages/DiaryPage'
+import { MemoryPage } from '@/pages/MemoryPage'
 import { Spinner } from '@/components/ui/Spinner'
 
 // ── Error Boundary ───────────────────────────────────────────────
@@ -80,6 +83,9 @@ function TitleManager() {
     else if (path === '/projects') title = 'Проекты — Neura'
     else if (path.startsWith('/projects/')) title = 'Проект — Neura'
     else if (path === '/settings') title = 'Настройки — Neura'
+    else if (path === '/heartbeat') title = 'Автоматизации — Neura'
+    else if (path === '/diary') title = 'Дневник — Neura'
+    else if (path === '/memory') title = 'Память — Neura'
     else if (path === '/login') title = 'Войти — Neura'
     else if (path === '/register') title = 'Регистрация — Neura'
     document.title = title
@@ -144,6 +150,9 @@ export default function App() {
                   <Route path="/projects"     element={<ProjectsPage />} />
                   <Route path="/projects/:id" element={<ProjectDetailPage />} />
                   <Route path="/settings"     element={<SettingsPage />} />
+                  <Route path="/heartbeat"    element={<HeartbeatPage />} />
+                  <Route path="/diary"        element={<DiaryPage />} />
+                  <Route path="/memory"       element={<MemoryPage />} />
                 </Route>
               </Route>
 

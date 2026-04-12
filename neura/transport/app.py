@@ -25,7 +25,7 @@ from neura.core.skills import SkillRegistry
 from neura.core.skill_learning import SkillUsageCollector, SkillEvolver
 from neura.core.heartbeat import HeartbeatEngine, parse_heartbeat_config
 from neura.core.proactive import ProactiveEngine
-from neura.monitoring import setup_monitoring, SERVICE_START, SERVICE_STOP
+from neura.monitoring import setup_monitoring, SERVICE_START, SERVICE_STOP, HEARTBEAT_FAIL
 from neura.storage.cache import Cache
 from neura.storage.db import Database
 from neura.transport.telegram import TelegramTransport
@@ -123,12 +123,11 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         finally:
             await bot.shutdown()
 
-    async def _heartbeat_run_task(capsule_id: str, telegram_id: int, prompt: str):
+    async def _heartbeat_run_task(capsule_id: str, telegram_id: int, task_name: str, prompt: str):
         """Run a prompt through Claude engine and send result to user."""
         cap = capsules.get(capsule_id)
         if not cap:
             return
-        from neura.core.engine import EngineConfig
         from neura.core.context import ContextBuilder
         from neura.core.memory import DiaryEntry
         from datetime import datetime as _dt, timezone as _tz
@@ -139,7 +138,7 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
             builder = ContextBuilder(cap)
             full_prompt = builder.build(prompt, parts, is_first_message=True)
 
-            cfg = EngineConfig(capsule_id=capsule_id, home_dir=cap.config.home_dir)
+            cfg = cap.get_engine_config()
             # Collect streaming output into a single result
             result_parts = []
             async for chunk in engine.stream(full_prompt, cfg):
@@ -167,9 +166,21 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
                 bot_response=result[:500],
             )
             await memory.add_diary(entry)
-            logger.info(f"Heartbeat task done: {capsule_id}, {len(result)} chars")
+            logger.info(f"Heartbeat task done: {capsule_id}/{task_name}, {len(result)} chars")
         except Exception as e:
-            logger.error(f"Heartbeat task failed {capsule_id}: {e}", exc_info=True)
+            logger.error(f"Heartbeat task failed {capsule_id}/{task_name}: {e}", exc_info=True)
+            # Alert Dmitry via HQ infra channel
+            try:
+                await monitoring["alert_sender"].send(
+                    f"Задача: <code>{task_name}</code>\n"
+                    f"Ошибка: <code>{str(e)[:300]}</code>",
+                    alert_type=HEARTBEAT_FAIL,
+                    capsule_id=capsule_id,
+                    deduplicate=True,
+                )
+            except Exception:
+                pass
+            # Also notify the capsule user
             from telegram import Bot
             bot = Bot(token=cap.config.bot_token)
             try:
@@ -317,7 +328,7 @@ async def main() -> None:
     await alert_sender.send(
         f"Запущено {capsule_count} капсул(а)",
         alert_type=SERVICE_START,
-        deduplicate=False,
+        deduplicate=True,  # Prevent spam during crash loops / rapid restarts
     )
 
     # Start Web API (uvicorn)
