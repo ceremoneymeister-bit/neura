@@ -22,6 +22,10 @@ skills/
 *.tmp
 /tmp/
 
+# Sessions (Telethon, etc.)
+*.session
+*.session-journal
+
 # Editor
 .vscode/
 *.swp
