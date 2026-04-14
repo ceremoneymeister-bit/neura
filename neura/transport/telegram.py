@@ -73,14 +73,19 @@ def _upload_path(capsule: "Capsule", suffix: str, original_name: str = "") -> st
 # ── Streaming Responder ────────────────────────────────────────
 
 class StreamingResponder:
-    """Progressive message editing during streaming.
+    """Progressive streaming during response generation.
 
-    Throttled: edit every EDIT_INTERVAL seconds. Stops inline editing
-    when text exceeds MAX_INLINE to avoid Telegram errors.
+    Uses Telegram's native sendMessageDraft API for smooth animated
+    streaming in private chats (no flickering, real-time text flow).
+    Falls back to edit_text approach in groups where drafts aren't supported.
+
+    Throttled: update every DRAFT_INTERVAL seconds.
     """
 
-    EDIT_INTERVAL = 3.0
+    DRAFT_INTERVAL = 1.0   # drafts animate smoothly — can update more often
+    EDIT_INTERVAL = 3.0    # edit_text flickers — throttle harder
     MAX_INLINE = 3800
+    MAX_DRAFT = 4096       # Telegram message limit
 
     def __init__(self, message, existing_msg=None):
         self._message = message
@@ -89,13 +94,37 @@ class StreamingResponder:
         self._last_text: str = ""
         self._exceeded_limit = False
         self._tool_label: str | None = None
+        self._use_draft = False
+        self._draft_id: int = 0
+        self._draft_started = False
 
     async def start(self) -> None:
+        chat_type = self._message.chat.type if self._message.chat else "private"
+        is_private = chat_type == "private"
+
+        if is_private and not self._response_msg:
+            # Use native streaming drafts in private chats
+            self._use_draft = True
+            self._draft_id = self._message.message_id  # unique per message
+            try:
+                bot = self._message.get_bot()
+                await bot.send_message_draft(
+                    chat_id=self._message.chat_id,
+                    draft_id=self._draft_id,
+                    text="🧠 Думаю...",
+                )
+                self._draft_started = True
+                self._last_edit_time = _time.monotonic()
+                return
+            except Exception as e:
+                logger.debug(f"Draft streaming failed, falling back to edit: {e}")
+                self._use_draft = False
+
+        # Fallback: edit_text approach for groups or if drafts fail
         if not self._response_msg:
             try:
                 self._response_msg = await self._message.reply_text("🧠 Думаю...")
             except Exception:
-                # Сообщение удалено до ответа — отправляем без reply_to
                 self._response_msg = await self._message.get_bot().send_message(
                     chat_id=self._message.chat_id,
                     text="🧠 Думаю...",
@@ -103,9 +132,42 @@ class StreamingResponder:
             self._last_edit_time = _time.monotonic()
 
     async def on_text(self, accumulated: str) -> None:
-        if self._exceeded_limit or not self._response_msg:
+        if self._exceeded_limit:
             return
 
+        if self._use_draft and self._draft_started:
+            await self._update_draft(accumulated)
+        elif self._response_msg:
+            await self._update_edit(accumulated)
+
+    async def _update_draft(self, accumulated: str) -> None:
+        """Update via sendMessageDraft — smooth animated streaming."""
+        if len(accumulated) > self.MAX_DRAFT:
+            self._exceeded_limit = True
+            return
+
+        now = _time.monotonic()
+        if now - self._last_edit_time < self.DRAFT_INTERVAL:
+            return
+
+        display = accumulated
+        if self._tool_label:
+            display = f"{self._tool_label}\n\n{accumulated}"
+
+        try:
+            bot = self._message.get_bot()
+            await bot.send_message_draft(
+                chat_id=self._message.chat_id,
+                draft_id=self._draft_id,
+                text=display[:self.MAX_DRAFT],
+            )
+            self._last_edit_time = now
+            self._last_text = display
+        except Exception:
+            pass
+
+    async def _update_edit(self, accumulated: str) -> None:
+        """Update via edit_text — legacy approach for groups."""
         if len(accumulated) > self.MAX_INLINE:
             self._exceeded_limit = True
             try:
@@ -131,8 +193,21 @@ class StreamingResponder:
 
     async def on_tool(self, tool_label: str) -> None:
         self._tool_label = tool_label
-        if self._response_msg and not self._exceeded_limit:
-            now = _time.monotonic()
+        now = _time.monotonic()
+
+        if self._use_draft and self._draft_started:
+            if now - self._last_edit_time >= self.DRAFT_INTERVAL:
+                try:
+                    bot = self._message.get_bot()
+                    await bot.send_message_draft(
+                        chat_id=self._message.chat_id,
+                        draft_id=self._draft_id,
+                        text=tool_label,
+                    )
+                    self._last_edit_time = now
+                except Exception:
+                    pass
+        elif self._response_msg and not self._exceeded_limit:
             if now - self._last_edit_time >= self.EDIT_INTERVAL:
                 try:
                     await self._response_msg.edit_text(tool_label)
@@ -141,12 +216,18 @@ class StreamingResponder:
                     pass
 
     async def finalize(self, response) -> None:
-        """Delete streaming message so final response is sent as new message.
+        """Clean up streaming state before final message is sent.
 
-        This ensures Telegram shows a notification badge for the response.
-        Previously, short responses were sent via edit_text which doesn't
-        trigger notifications — users didn't know the bot had answered.
+        For drafts: send empty draft to clear it (final send_message replaces it).
+        For edit_text: delete the streaming message.
+        Both ensure Telegram shows a notification badge for the final response.
         """
+        if self._use_draft and self._draft_started:
+            # Draft is automatically replaced when send_message is called
+            # No cleanup needed — Telegram handles it
+            self._draft_started = False
+            return
+
         if not self._response_msg:
             return
         try:
