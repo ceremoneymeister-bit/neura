@@ -3,7 +3,7 @@ import { ChevronDown, Download } from 'lucide-react'
 import type { Message } from '@/api/conversations'
 import { getMessages, updateConversation, listConversations } from '@/api/conversations'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import type { WsChunk } from '@/hooks/useWebSocket'
+import type { WsChunk, ToolStep } from '@/hooks/useWebSocket'
 import { MessageList } from './MessageList'
 import { StreamingMessage } from './StreamingMessage'
 import { ChatInput } from './ChatInput'
@@ -23,6 +23,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [showScrollBottom, setShowScrollBottom] = useState(false)
   const [autoTitleDone, setAutoTitleDone] = useState(false)
+  const [toolSteps, setToolSteps] = useState<ToolStep[]>([])
   const [conversationModel, setConversationModel] = useState<string | undefined>(undefined)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -56,6 +57,29 @@ export function ChatView({ conversationId }: ChatViewProps) {
       case 'tool':
         setToolText(chunk.content)
         break
+      case 'tool_start':
+        setToolText(chunk.content)
+        setIsStreaming(true)
+        setToolSteps((prev) => [
+          ...prev,
+          {
+            tool_id: chunk.tool_id ?? `t_${Date.now()}`,
+            tool: chunk.tool ?? 'unknown',
+            label: chunk.content,
+            detail: chunk.detail,
+            status: 'running',
+            startedAt: Date.now(),
+          },
+        ])
+        break
+      case 'tool_end':
+        setToolSteps((prev) =>
+          prev.map((s) =>
+            s.tool_id === chunk.tool_id ? { ...s, status: 'done' as const } : s,
+          ),
+        )
+        setToolText(null)
+        break
       case 'error':
         setError(chunk.content)
         setIsStreaming(false)
@@ -85,6 +109,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setStatusText(null)
     setToolText(null)
     setIsStreaming(false)
+    setToolSteps([])
 
     // Send queued message if any
     const queued = queuedMessageRef.current
@@ -470,6 +495,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               text={streamingText}
               statusText={statusText}
               toolText={toolText}
+              toolSteps={toolSteps}
               onStop={handleStop}
             />
           )}
@@ -484,7 +510,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           onClick={scrollToBottom}
           aria-label="Прокрутить вниз"
           title="Прокрутить вниз"
-          className="absolute bottom-24 right-5 z-10 p-2 rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] shadow-lg transition-all animate-fade-in"
+          className="absolute bottom-24 right-5 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-lg transition-all animate-fade-in hover:bg-[var(--bg-hover)]"
         >
           <ChevronDown size={16} />
         </button>
@@ -492,7 +518,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {/* Error banner */}
       {error && !isStreaming && (
-        <div className="mx-4 mb-2 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between gap-4">
+        <div className="mx-4 mb-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between gap-4">
           <span>{error}</span>
           <button
             onClick={() => setError(null)}

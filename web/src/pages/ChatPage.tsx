@@ -63,13 +63,13 @@ function WelcomeScreen() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Centered greeting + suggestion cards */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4">
+      {/* Centered: greeting → input → suggestion cards */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 pb-[20vh]">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-3 mb-8"
         >
           <TimeIcon size={32} />
           <h1
@@ -82,18 +82,20 @@ function WelcomeScreen() {
           </h1>
         </motion.div>
 
-        {/* Suggestion cards — insert into input, don't send */}
-        <div className="mt-8">
-          <SuggestionCards columns={3} />
+        {/* Input — centered */}
+        <div className="w-full max-w-3xl">
+          <ChatInput
+            onSend={handleSend}
+            disabled={sending}
+            placeholder="Чем могу помочь сегодня?"
+          />
+        </div>
+
+        {/* Suggestion cards — below input */}
+        <div className="mt-4">
+          <SuggestionCards />
         </div>
       </div>
-
-      {/* Input at bottom */}
-      <ChatInput
-        onSend={handleSend}
-        disabled={sending}
-        placeholder="Чем могу помочь сегодня?"
-      />
     </div>
   )
 }

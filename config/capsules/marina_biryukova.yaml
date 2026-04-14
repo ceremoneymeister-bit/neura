@@ -55,6 +55,9 @@ skills:
 - telegram-bot-builder
 - skill-creator
 memory:
+  layered_loading: true
+  knowledge_graph: true
+  wisdom_graduation: true
   diary_retention_days: 90
   max_long_term_entries: 200
   context_window:

@@ -70,6 +70,8 @@ class OutgoingMessage:
     learnings: list[str] = field(default_factory=list)
     corrections: list[str] = field(default_factory=list)
     rules: list[str] = field(default_factory=list)
+    memory_entries: list[str] = field(default_factory=list)
+    facts: list[tuple[str, str, str]] = field(default_factory=list)  # (subject, predicate, object)
     telegraph_url: str | None = None
     is_long: bool = False
     pending_action: PendingAction | None = None
@@ -93,7 +95,8 @@ class ResponseParser:
         text = engine_text
 
         # 1. Extract markers
-        text, learnings, corrections, rules = ResponseParser._parse_markers(text)
+        text, learnings, corrections, rules, memory_entries, facts = (
+            ResponseParser._parse_markers(text))
 
         # 2. Extract action confirmation marker
         text, pending_action = ResponseParser._extract_action(text)
@@ -111,23 +114,41 @@ class ResponseParser:
             learnings=learnings,
             corrections=corrections,
             rules=rules,
+            memory_entries=memory_entries,
+            facts=facts,
             is_long=is_long,
             pending_action=pending_action,
         )
 
     @staticmethod
-    def _parse_markers(text: str) -> tuple[str, list[str], list[str], list[str]]:
-        """Extract [LEARN:...], [CORRECTION:...], and [RULE:...] markers."""
+    def _parse_markers(text: str) -> tuple[str, list[str], list[str], list[str], list[str], list[tuple[str, str, str]]]:
+        """Extract [LEARN:], [CORRECTION:], [RULE:], [MEMORY:], [FACT:s|p|o] markers."""
         learnings = re.findall(r'\[LEARN:(.*?)\]', text, re.DOTALL)
         corrections = re.findall(r'\[CORRECTION:(.*?)\]', text, re.DOTALL)
         rules = re.findall(r'\[RULE:(.*?)\]', text, re.DOTALL)
+        memory_entries = re.findall(r'\[MEMORY:(.*?)\]', text, re.DOTALL)
+
+        # [FACT:subject|predicate|object] → knowledge graph triples
+        raw_facts = re.findall(r'\[FACT:(.*?)\]', text, re.DOTALL)
+        facts: list[tuple[str, str, str]] = []
+        for raw in raw_facts:
+            parts = [p.strip() for p in raw.split('|')]
+            if len(parts) == 3 and all(parts):
+                facts.append((parts[0], parts[1], parts[2]))
 
         cleaned = re.sub(r'\[LEARN:.*?\]', '', text, flags=re.DOTALL)
         cleaned = re.sub(r'\[CORRECTION:.*?\]', '', cleaned, flags=re.DOTALL)
         cleaned = re.sub(r'\[RULE:.*?\]', '', cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r'\[MEMORY:.*?\]', '', cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r'\[FACT:.*?\]', '', cleaned, flags=re.DOTALL)
         cleaned = cleaned.strip()
 
-        return cleaned, [l.strip() for l in learnings], [c.strip() for c in corrections], [r.strip() for r in rules]
+        return (cleaned,
+                [l.strip() for l in learnings],
+                [c.strip() for c in corrections],
+                [r.strip() for r in rules],
+                [m.strip() for m in memory_entries],
+                facts)
 
     @staticmethod
     def _extract_action(text: str) -> tuple[str, PendingAction | None]:

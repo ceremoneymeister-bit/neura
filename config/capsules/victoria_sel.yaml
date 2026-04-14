@@ -58,6 +58,9 @@ skills:
 memory:
   diary_retention_days: 90
   max_long_term_entries: 100
+  layered_loading: true
+  knowledge_graph: true
+  wisdom_graduation: true
   context_window:
     today_diary: 20
     recent_days: 30

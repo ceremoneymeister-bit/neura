@@ -19,14 +19,8 @@ function initials(name: string): string {
     .join('')
 }
 
-function colorFromName(name: string): string {
-  const colors = [
-    'bg-violet-600', 'bg-blue-600', 'bg-emerald-600',
-    'bg-orange-600', 'bg-pink-600', 'bg-cyan-600',
-  ]
-  let hash = 0
-  for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) % colors.length
-  return colors[hash] ?? 'bg-violet-600'
+function colorFromName(_name: string): string {
+  return 'bg-[#393937]'
 }
 
 export function Avatar({ name = '', src, size = 'md', className = '' }: AvatarProps) {

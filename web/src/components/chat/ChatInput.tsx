@@ -253,7 +253,7 @@ export function ChatInput({
 
   return (
     <div
-      className="relative px-4 pb-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shrink-0 max-w-3xl mx-auto w-full"
+      className="relative px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shrink-0 max-w-3xl mx-auto w-full"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -306,10 +306,8 @@ export function ChatInput({
 
       {/* Input box — Claude.ai style */}
       <div
-        className={`flex flex-col bg-[var(--bg-card)] border rounded-2xl transition-colors ${
-          isDragging
-            ? 'border-[var(--accent)]'
-            : 'border-[var(--border)]'
+        className={`flex flex-col liquid-glass-input rounded-[20px] outline-none ${
+          isDragging ? '!border-[var(--accent)]' : ''
         }`}
       >
         {/* Textarea area */}
@@ -323,7 +321,7 @@ export function ChatInput({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className="w-full bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none leading-6 px-4 pt-3 pb-1 min-h-[36px] focus:outline-none focus:ring-0 focus:shadow-none"
+          className="w-full bg-transparent text-[15px] text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none leading-6 px-4 pt-3.5 pb-1.5 min-h-[44px] focus:outline-none focus:ring-0 focus:shadow-none"
           style={{ boxShadow: 'none' }}
         />
         <input
@@ -343,7 +341,7 @@ export function ChatInput({
             disabled={disabled}
             title="Прикрепить файл"
             aria-label="Прикрепить файл"
-            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-30 rounded-md hover:bg-[var(--bg-hover)]"
+            className="p-2 md:p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-30 rounded-md hover:bg-[var(--bg-hover)] min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
           >
             <Plus size={18} strokeWidth={1.5} />
           </button>
@@ -372,7 +370,7 @@ export function ChatInput({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
                     transition={{ duration: 0.12 }}
-                    className="absolute right-0 bottom-full mb-1.5 w-48 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] shadow-lg shadow-black/30 z-50 overflow-hidden"
+                    className="absolute right-0 bottom-full mb-1.5 w-52 liquid-glass-popup rounded-xl z-50 overflow-hidden"
                   >
                     {MODEL_OPTIONS.map((model) => (
                       <button
@@ -414,7 +412,7 @@ export function ChatInput({
               disabled={disabled}
               title={isRecording ? 'Остановить запись' : 'Голосовое сообщение'}
               aria-label={isRecording ? 'Остановить запись' : 'Голосовое сообщение'}
-              className={`p-1.5 rounded-md transition-colors disabled:opacity-30 ${
+              className={`p-2 md:p-1.5 rounded-md transition-colors disabled:opacity-30 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
                 isRecording
                   ? 'text-red-400 pulse-ring'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
@@ -430,7 +428,7 @@ export function ChatInput({
               disabled={disabled || (!text.trim() && attachedFiles.length === 0)}
               title="Отправить"
               aria-label="Отправить"
-              className={`p-1 rounded-full transition-all duration-150 ease-in-out disabled:opacity-30 ${
+              className={`p-2 md:p-1 rounded-full transition-all duration-150 ease-in-out disabled:opacity-30 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
                 text.trim() || attachedFiles.length > 0
                   ? 'bg-[var(--accent)] text-white hover:brightness-110'
                   : 'bg-transparent text-[var(--text-muted)]'

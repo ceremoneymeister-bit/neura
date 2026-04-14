@@ -43,7 +43,7 @@ from neura.transport.auth import (
 logger = logging.getLogger(__name__)
 
 # Upload directory
-UPLOAD_DIR = Path(os.environ.get("NEURA_UPLOAD_DIR", "/tmp/neura-uploads"))
+UPLOAD_DIR = Path(os.environ.get("NEURA_UPLOAD_DIR", "/opt/neura-v2/data/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Generated files directory (where Claude writes images/docs via tools)
@@ -64,6 +64,34 @@ _RETRYABLE_PATTERNS = ["timeout", "rate limit", "overloaded", "connection", "ECO
 def _is_retryable_error(error_text: str) -> bool:
     lower = error_text.lower()
     return any(p in lower for p in _RETRYABLE_PATTERNS)
+
+
+def _tool_detail(chunk) -> dict | None:
+    """Extract compact detail from tool chunk for frontend display."""
+    if not chunk.tool_input:
+        return None
+    inp = chunk.tool_input
+    tool = chunk.tool
+    detail = {}
+    if tool in ("Read", "Write", "Edit"):
+        fp = inp.get("file_path", "")
+        if fp:
+            parts = fp.rstrip("/").split("/")
+            detail["file"] = "/".join(parts[-2:]) if len(parts) > 2 else fp
+    elif tool == "Bash":
+        cmd = inp.get("command", "")
+        if cmd:
+            detail["command"] = cmd[:80]
+    elif tool == "Grep":
+        detail["pattern"] = inp.get("pattern", "")[:50]
+        if inp.get("path"):
+            parts = inp["path"].rstrip("/").split("/")
+            detail["path"] = "/".join(parts[-2:])
+    elif tool == "Glob":
+        detail["pattern"] = inp.get("pattern", "")[:50]
+    elif tool == "WebSearch":
+        detail["query"] = inp.get("query", "")[:60]
+    return detail if detail else None
 
 
 # ── Theme config loader ─────────────────────────────────────────
@@ -354,6 +382,66 @@ def create_web_app(
         allow_headers=["Authorization", "Content-Type"],
     )
 
+    # Load remote capsules config (migrated to KZ servers)
+    from neura.transport.remote_proxy import load_remote_capsules, is_remote, proxy_rest, get_remote_host
+    _remote_capsules = load_remote_capsules()
+
+    # ── Remote proxy middleware (before logging) ─────────────────
+    # Routes API requests for migrated capsules to their KZ servers.
+    # Auth endpoints stay local (user DB is on Aeza).
+
+    _LOCAL_PREFIXES = ("/api/auth/", "/api/health", "/api/docs", "/api/files/serve/")
+
+    @app.middleware("http")
+    async def remote_proxy_middleware(request: Request, call_next):
+        path = request.url.path
+
+        # Skip non-API, auth, health, and static routes
+        if not path.startswith("/api/") or any(path.startswith(p) for p in _LOCAL_PREFIXES):
+            return await call_next(request)
+
+        # Extract capsule_id from JWT
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return await call_next(request)
+
+        try:
+            from neura.transport.auth import decode_token
+            payload = decode_token(auth_header[7:])
+            capsule_id = payload.get("capsule_id")
+        except Exception:
+            return await call_next(request)
+
+        if not is_remote(capsule_id):
+            return await call_next(request)
+
+        # Proxy to remote server
+        start = time.monotonic()
+        try:
+            body = await request.body()
+            query = str(request.url.query) if request.url.query else ""
+            resp = await proxy_rest(
+                capsule_id, request.method, path,
+                token=auth_header[7:],
+                body=body if body else None,
+                query_params=query,
+            )
+            from starlette.responses import Response
+            duration_ms = (time.monotonic() - start) * 1000
+            logger.info(
+                "[proxy] %s %s → remote %s → %d (%.0fms)",
+                request.method, path, capsule_id, resp.status_code, duration_ms,
+            )
+            return Response(
+                content=resp.content,
+                status_code=resp.status_code,
+                headers=dict(resp.headers),
+                media_type=resp.headers.get("content-type"),
+            )
+        except Exception as e:
+            logger.error("[proxy] REST proxy failed for %s: %s", capsule_id, e)
+            return await call_next(request)
+
     # ── Request logging middleware ───────────────────────────────
 
     @app.middleware("http")
@@ -374,6 +462,7 @@ def create_web_app(
     app.state.memory = memory
     app.state.queue = queue
     app.state.capsules = capsules or {}
+    app.state.remote_capsules = _remote_capsules
 
     # ── Auth shortcuts ───────────────────────────────────────────
 
@@ -959,12 +1048,32 @@ def create_web_app(
 
     @app.get("/api/files/serve/{filename}")
     async def serve_file(filename: str):
-        """Serve an uploaded or generated file."""
+        """Serve an uploaded or generated file. Falls back to remote KZ servers."""
         safe = Path(filename).name  # prevent path traversal
         fpath = UPLOAD_DIR / safe
-        if not fpath.exists():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
-        return FileResponse(fpath, filename=safe)
+        if fpath.exists():
+            return FileResponse(fpath, filename=safe)
+
+        # File not local — try remote servers (for migrated capsules)
+        if _remote_capsules:
+            import httpx
+            seen_hosts = set()
+            for capsule_id, host in _remote_capsules.items():
+                if host in seen_hosts:
+                    continue
+                seen_hosts.add(host)
+                try:
+                    async with httpx.AsyncClient(timeout=15) as client:
+                        resp = await client.get(f"{host}/api/files/serve/{safe}")
+                        if resp.status_code == 200:
+                            # Cache locally for future requests
+                            fpath.write_bytes(resp.content)
+                            ct = resp.headers.get("content-type", "application/octet-stream")
+                            return FileResponse(fpath, filename=safe, media_type=ct)
+                except Exception:
+                    continue
+
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
 
     # ═══════════════════════════════════════════════════════════
     # HEALTH
@@ -1424,6 +1533,49 @@ def create_web_app(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory entry not found")
 
     # ═══════════════════════════════════════════════════════════
+    # FEEDBACK — Thumbs up/down on messages
+    # ═══════════════════════════════════════════════════════════
+
+    class FeedbackRequest(BaseModel):
+        message_id: int
+        vote: str  # "up" | "down"
+        comment: Optional[str] = None
+
+    @app.post("/api/feedback", status_code=201)
+    async def submit_feedback(
+        body: FeedbackRequest, current_user: CurrentUser, request: Request,
+    ):
+        """Record user feedback (thumbs up/down) on an assistant message."""
+        p = request.app.state.db_pool
+        if p is None:
+            raise HTTPException(500, "Database not available")
+
+        if body.vote not in ("up", "down"):
+            raise HTTPException(400, "Vote must be 'up' or 'down'")
+
+        user_id = current_user["id"]
+
+        # Upsert — one vote per user per message
+        await p.execute(
+            """INSERT INTO message_feedback (message_id, user_id, vote, comment)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (message_id, user_id)
+               DO UPDATE SET vote = $3, comment = $4, created_at = NOW()""",
+            body.message_id, user_id, body.vote, body.comment,
+        )
+
+        # Log negative feedback for capsule improvement
+        if body.vote == "down":
+            capsule_id = current_user.get("capsule_id")
+            logger.warning(
+                "[feedback] 👎 capsule=%s user=%d msg=%d comment=%s",
+                capsule_id, user_id, body.message_id,
+                (body.comment or "")[:200],
+            )
+
+        return {"status": "ok"}
+
+    # ═══════════════════════════════════════════════════════════
     # WEBSOCKET — STREAMING CHAT
     # ═══════════════════════════════════════════════════════════
 
@@ -1578,7 +1730,18 @@ def create_web_app(
                         await session.broadcast({"type": "text", "content": accumulated})
                     elif chunk.type == "tool_start":
                         tools_used.append(chunk.tool)
-                        await session.broadcast({"type": "tool", "content": chunk.text})
+                        await session.broadcast({
+                            "type": "tool_start",
+                            "content": chunk.text,
+                            "tool": chunk.tool,
+                            "tool_id": chunk.tool_id,
+                            "detail": _tool_detail(chunk),
+                        })
+                    elif chunk.type == "tool_end":
+                        await session.broadcast({
+                            "type": "tool_end",
+                            "tool_id": chunk.tool_id,
+                        })
                     elif chunk.type == "result":
                         accumulated = chunk.text or accumulated
                         if chunk.session_id:
@@ -1707,6 +1870,14 @@ def create_web_app(
             capsule_id = payload.get("capsule_id")
         except Exception:
             await websocket.close(code=4001, reason="Unauthorized")
+            return
+
+        # Remote capsule — proxy entire WS to KZ server
+        if is_remote(capsule_id):
+            await websocket.accept()
+            from neura.transport.remote_proxy import proxy_websocket
+            logger.info(f"[proxy] WS proxy for remote capsule={capsule_id}, conv_id={conv_id}")
+            await proxy_websocket(websocket, capsule_id, conv_id, token)
             return
 
         await websocket.accept()

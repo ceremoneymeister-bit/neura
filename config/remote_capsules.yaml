@@ -1,0 +1,18 @@
+# Remote capsules — маршрутизация для мигрированных капсул
+# capsule_id → URL сервера где капсула работает
+# Web proxy на Aeza будет проксировать WS/REST запросы туда
+
+sergey_savchuk:
+  host: http://89.207.254.106:8080
+  name: "Сергей Савчук"
+  server: cloud-002
+
+oksana_ksyfleur:
+  host: http://89.207.254.62:8080
+  name: "Оксана Ксюфлёр"
+  server: cloud-001
+
+yana_berezhnaya:
+  host: http://89.207.254.107:8080
+  name: "Яна Бережная"
+  server: neura-kz3

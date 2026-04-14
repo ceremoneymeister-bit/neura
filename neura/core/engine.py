@@ -71,10 +71,12 @@ DEFAULT_TOOLS = [
 @dataclass
 class Chunk:
     """One streaming event from Claude CLI."""
-    type: str  # "text", "tool_use", "tool_result", "status", "error"
+    type: str  # "text", "tool_start", "tool_end", "status", "error", "result"
     text: str = ""
     tool: str = ""
     session_id: str = ""
+    tool_input: dict | None = None  # file_path, command, pattern etc.
+    tool_id: str = ""  # tool_use_id for matching start/end
 
 
 @dataclass
@@ -109,6 +111,39 @@ TOOL_LABELS = {
     "WebSearch": "🌐 Ищу в интернете",
     "WebFetch": "🌐 Загружаю",
 }
+
+def _tool_label(tool_name: str, tool_input: dict) -> str:
+    """Generate a human-readable label with detail from tool input."""
+    base = TOOL_LABELS.get(tool_name, f"🔧 {tool_name}")
+    if not tool_input:
+        return base
+    # Extract meaningful detail
+    detail = ""
+    if tool_name in ("Read", "Write", "Edit"):
+        fp = tool_input.get("file_path", "")
+        if fp:
+            # Show just filename or last 2 path segments
+            parts = fp.rstrip("/").split("/")
+            detail = "/".join(parts[-2:]) if len(parts) > 2 else fp
+    elif tool_name == "Bash":
+        cmd = tool_input.get("command", "")
+        if cmd:
+            detail = cmd[:60] + ("…" if len(cmd) > 60 else "")
+    elif tool_name == "Grep":
+        pat = tool_input.get("pattern", "")
+        if pat:
+            detail = f'"{pat[:40]}"'
+    elif tool_name == "Glob":
+        pat = tool_input.get("pattern", "")
+        if pat:
+            detail = pat[:40]
+    elif tool_name == "WebSearch":
+        q = tool_input.get("query", "")
+        if q:
+            detail = f'"{q[:40]}"'
+    if detail:
+        return f"{base} · {detail}"
+    return base
 
 
 def _kill_process_tree(proc) -> None:
@@ -422,8 +457,11 @@ class ClaudeEngine:
                     chunks.append(Chunk(type="text", text=block.get("text", ""), session_id=session_id))
                 elif btype == "tool_use":
                     tool_name = block.get("name", "unknown")
-                    label = TOOL_LABELS.get(tool_name, f"🔧 {tool_name}")
-                    chunks.append(Chunk(type="tool_start", text=label, tool=tool_name, session_id=session_id))
+                    tool_id = block.get("id", "")
+                    tool_input = block.get("input", {})
+                    label = _tool_label(tool_name, tool_input)
+                    chunks.append(Chunk(type="tool_start", text=label, tool=tool_name,
+                                       session_id=session_id, tool_input=tool_input, tool_id=tool_id))
             if not chunks:
                 chunks.append(Chunk(type="status", text="⏳ Думаю...", session_id=session_id))
             return chunks
@@ -437,8 +475,19 @@ class ClaudeEngine:
             cb = event.get("content_block", {})
             if cb.get("type") == "tool_use":
                 tool_name = cb.get("name", "unknown")
-                label = TOOL_LABELS.get(tool_name, f"🔧 {tool_name}")
-                chunks.append(Chunk(type="tool_start", text=label, tool=tool_name))
+                tool_id = cb.get("id", "")
+                tool_input = cb.get("input", {})
+                label = _tool_label(tool_name, tool_input)
+                chunks.append(Chunk(type="tool_start", text=label, tool=tool_name,
+                                   tool_input=tool_input, tool_id=tool_id))
+
+        # tool_result → emit tool_end
+        if etype == "user" and "message" in event:
+            msg = event.get("message", {})
+            for block in msg.get("content", []):
+                if block.get("type") == "tool_result":
+                    tool_id = block.get("tool_use_id", "")
+                    chunks.append(Chunk(type="tool_end", tool_id=tool_id))
 
         if etype == "result":
             text = event.get("result", "")

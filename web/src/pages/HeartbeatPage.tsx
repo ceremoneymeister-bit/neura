@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Heart, Plus, Trash2, Clock, Zap, Bell, Pencil, AlertCircle,
+  Heart, Plus, Trash2, Zap, Bell, Pencil, AlertCircle,
+  Sparkles, FileText, Mail, BarChart3, CalendarCheck, MessageSquare,
+  ChevronDown, Play,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -15,19 +17,123 @@ import {
   deleteHeartbeat,
 } from '@/api/heartbeat'
 
+// ── Templates ───────────────────────────────────────────────────
+
+interface Template {
+  id: string
+  icon: typeof Sparkles
+  label: string
+  description: string
+  defaults: {
+    display_name: string
+    message: string
+    scheduleBase: string
+    time: string
+    type: 'reminder' | 'task'
+  }
+}
+
+const TEMPLATES: Template[] = [
+  {
+    id: 'morning_digest',
+    icon: Sparkles,
+    label: 'Утренний дайджест',
+    description: 'Агент соберёт задачи, события и приоритеты на день',
+    defaults: {
+      display_name: 'Утренний дайджест',
+      message: 'Собери мой утренний дайджест:\n1. Какие задачи на сегодня?\n2. Есть ли важные события в календаре?\n3. На что обратить внимание?',
+      scheduleBase: 'daily',
+      time: '09:00',
+      type: 'task',
+    },
+  },
+  {
+    id: 'weekly_report',
+    icon: BarChart3,
+    label: 'Еженедельный отчёт',
+    description: 'Итоги недели: что сделано, что в работе',
+    defaults: {
+      display_name: 'Еженедельный отчёт',
+      message: 'Подготовь еженедельный отчёт:\n1. Что было сделано за неделю?\n2. Что осталось в работе?\n3. Какие приоритеты на следующую неделю?',
+      scheduleBase: 'friday',
+      time: '17:00',
+      type: 'task',
+    },
+  },
+  {
+    id: 'content_ideas',
+    icon: FileText,
+    label: 'Идеи для контента',
+    description: 'Агент предложит темы для постов и публикаций',
+    defaults: {
+      display_name: 'Идеи для контента',
+      message: 'Предложи 3 идеи для постов на эту неделю. Учти тренды, мою нишу и стиль общения. Для каждой идеи дай: заголовок, ключевой посыл, формат (текст/карусель/видео).',
+      scheduleBase: 'monday',
+      time: '10:00',
+      type: 'task',
+    },
+  },
+  {
+    id: 'check_in',
+    icon: MessageSquare,
+    label: 'Напоминание-чекин',
+    description: 'Простое текстовое сообщение по расписанию',
+    defaults: {
+      display_name: 'Чекин',
+      message: 'Привет! Как продвигаются задачи? Нужна помощь с чем-нибудь?',
+      scheduleBase: 'daily',
+      time: '14:00',
+      type: 'reminder',
+    },
+  },
+  {
+    id: 'email_digest',
+    icon: Mail,
+    label: 'Дайджест сообщений',
+    description: 'Агент проверит входящие и подготовит сводку',
+    defaults: {
+      display_name: 'Дайджест сообщений',
+      message: 'Проверь мои входящие сообщения за последние часы. Выдели важные, предложи краткие ответы.',
+      scheduleBase: 'every 6h',
+      time: '10:00',
+      type: 'task',
+    },
+  },
+  {
+    id: 'custom',
+    icon: Plus,
+    label: 'Своя автоматизация',
+    description: 'Создать с нуля',
+    defaults: {
+      display_name: '',
+      message: '',
+      scheduleBase: 'daily',
+      time: '10:00',
+      type: 'reminder',
+    },
+  },
+]
+
 // ── Schedule presets ─────────────────────────────────────────────
 
 const SCHEDULE_PRESETS = [
-  { label: 'Каждый день', value: 'daily', icon: Clock },
-  { label: 'Пн', value: 'monday', icon: Clock },
-  { label: 'Вт', value: 'tuesday', icon: Clock },
-  { label: 'Ср', value: 'wednesday', icon: Clock },
-  { label: 'Чт', value: 'thursday', icon: Clock },
-  { label: 'Пт', value: 'friday', icon: Clock },
-  { label: 'Сб', value: 'saturday', icon: Clock },
-  { label: 'Вс', value: 'sunday', icon: Clock },
-  { label: 'Каждые 2ч', value: 'every 2h', icon: Zap },
-  { label: 'Каждые 4ч', value: 'every 4h', icon: Zap },
+  { label: 'Каждый день', value: 'daily' },
+  { label: 'Пн', value: 'monday' },
+  { label: 'Вт', value: 'tuesday' },
+  { label: 'Ср', value: 'wednesday' },
+  { label: 'Чт', value: 'thursday' },
+  { label: 'Пт', value: 'friday' },
+  { label: 'Сб', value: 'saturday' },
+  { label: 'Вс', value: 'sunday' },
+] as const
+
+const INTERVAL_PRESETS = [
+  { label: '1ч', value: 'every 1h' },
+  { label: '2ч', value: 'every 2h' },
+  { label: '4ч', value: 'every 4h' },
+  { label: '6ч', value: 'every 6h' },
+  { label: '8ч', value: 'every 8h' },
+  { label: '12ч', value: 'every 12h' },
 ] as const
 
 function scheduleToLabel(schedule: string): string {
@@ -40,8 +146,74 @@ function scheduleToLabel(schedule: string): string {
   if (s.startsWith('friday') || s.startsWith('пт')) return 'Пятница'
   if (s.startsWith('saturday') || s.startsWith('сб')) return 'Суббота'
   if (s.startsWith('sunday') || s.startsWith('вс')) return 'Воскресенье'
-  if (s.startsWith('every')) return s.replace('every ', 'Каждые ')
+  const everyMatch = s.match(/every\s+(\d+)([hm])/)
+  if (everyMatch) {
+    const n = everyMatch[1]
+    const unit = everyMatch[2] === 'h' ? 'ч' : 'мин'
+    return `Каждые ${n}${unit}`
+  }
   return schedule
+}
+
+function nextFireLabel(schedule: string): string {
+  const s = schedule.toLowerCase().trim()
+  const now = new Date()
+  // MSK offset
+  const mskOffset = 3 * 60
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  const mskMinutes = utcMinutes + mskOffset
+  const mskHour = Math.floor((mskMinutes % (24 * 60)) / 60)
+  const mskMin = mskMinutes % 60
+  const mskDay = ((now.getUTCDay() + (mskMinutes >= 24 * 60 ? 1 : 0)) % 7 + 6) % 7 // 0=Mon
+
+  // Interval-based
+  const everyMatch = s.match(/every\s+(\d+)([hm])/)
+  if (everyMatch) {
+    const n = parseInt(everyMatch[1])
+    const unit = everyMatch[2]
+    if (unit === 'h') return `~через ${n}ч`
+    return `~через ${n} мин`
+  }
+
+  // Extract target time
+  const timeMatch = s.match(/(\d{1,2}):(\d{2})/)
+  if (!timeMatch) return ''
+  const targetH = parseInt(timeMatch[1])
+  const targetM = parseInt(timeMatch[2])
+
+  const targetMinutes = targetH * 60 + targetM
+  const nowMinutes = mskHour * 60 + mskMin
+
+  if (s.startsWith('daily') || s.startsWith('ежедневно')) {
+    if (targetMinutes > nowMinutes) {
+      const diff = targetMinutes - nowMinutes
+      const h = Math.floor(diff / 60)
+      const m = diff % 60
+      return h > 0 ? `через ${h}ч ${m}мин` : `через ${m} мин`
+    }
+    return 'завтра'
+  }
+
+  // Day-based
+  const dayMap: Record<string, number> = {
+    monday: 0, tuesday: 1, wednesday: 2, thursday: 3,
+    friday: 4, saturday: 5, sunday: 6,
+  }
+  for (const [name, idx] of Object.entries(dayMap)) {
+    if (s.startsWith(name)) {
+      let daysUntil = (idx - mskDay + 7) % 7
+      if (daysUntil === 0 && targetMinutes <= nowMinutes) daysUntil = 7
+      if (daysUntil === 0) {
+        const diff = targetMinutes - nowMinutes
+        const h = Math.floor(diff / 60)
+        const m = diff % 60
+        return h > 0 ? `сегодня через ${h}ч` : `через ${m} мин`
+      }
+      if (daysUntil === 1) return 'завтра'
+      return `через ${daysUntil} дн.`
+    }
+  }
+  return ''
 }
 
 function extractTime(schedule: string): string {
@@ -61,14 +233,12 @@ function minutesToTime(mins: number): string {
   return `${h}:${m}`
 }
 
-// Convert snake_case technical name to readable title
 function formatName(name: string): string {
   return name
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// Detect if message is a script path, not human text
 function isScriptMessage(message: string): boolean {
   const m = message.trim()
   return (
@@ -91,22 +261,65 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center gap-4 py-20 text-center"
     >
-      <div className="w-16 h-16 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center">
+      <div className="w-16 h-16 rounded-2xl liquid-glass flex items-center justify-center">
         <Heart size={28} className="text-[var(--accent)]" />
       </div>
       <div>
         <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-1">
-          Нет напоминаний
+          Нет автоматизаций
         </h2>
-        <p className="text-sm text-[var(--text-muted)] max-w-xs">
-          Создайте напоминание или автозадачу — агент будет
-          присылать их по расписанию
+        <p className="text-sm text-[var(--text-muted)] max-w-sm">
+          Настройте автоматизации — агент будет выполнять задачи
+          по расписанию и присылать результат
         </p>
       </div>
       <Button onClick={onCreate} icon={<Plus size={16} />}>
-        Создать первое
+        Создать первую
       </Button>
     </motion.div>
+  )
+}
+
+// ── Template Picker ──────────────────────────────────────────────
+
+function TemplatePicker({ onSelect }: { onSelect: (t: Template) => void }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[var(--text-secondary)]">
+        Выберите шаблон или создайте с нуля
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {TEMPLATES.map((t) => {
+          const Icon = t.icon
+          const isCustom = t.id === 'custom'
+          return (
+            <button
+              key={t.id}
+              onClick={() => onSelect(t)}
+              className={[
+                'flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-150',
+                isCustom
+                  ? 'border border-dashed border-[var(--border)] hover:border-[var(--accent)]/30'
+                  : 'liquid-glass-btn !transform-none',
+              ].join(' ')}
+            >
+              <div className={[
+                'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                isCustom
+                  ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
+                  : 'bg-[var(--accent)]/10 text-[var(--accent)]',
+              ].join(' ')}>
+                <Icon size={16} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{t.label}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{t.description}</p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -121,6 +334,7 @@ interface CardProps {
 
 function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
   const isTask = task.type === 'task'
+  const nextFire = nextFireLabel(task.schedule)
 
   return (
     <motion.div
@@ -130,10 +344,10 @@ function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.15 }}
       className={[
-        'group relative rounded-xl border p-4 transition-all duration-200',
+        'group relative rounded-xl p-4 transition-all duration-200',
         task.enabled
-          ? 'bg-[var(--bg-card)] border-[var(--border)] hover:border-[var(--accent)]/40 hover:shadow-lg hover:shadow-[var(--accent)]/5'
-          : 'bg-[var(--bg-primary)] border-[var(--border)]/50 opacity-60',
+          ? 'liquid-glass-btn !transform-none'
+          : 'bg-[var(--bg-primary)]/50 border border-[var(--border)]/30 opacity-60',
       ].join(' ')}
     >
       {/* Header row */}
@@ -153,8 +367,9 @@ function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
           </h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             {scheduleToLabel(task.schedule)}
-            <span className="mx-1.5 opacity-40">·</span>
-            {extractTime(task.schedule)}
+            {!task.schedule.toLowerCase().startsWith('every') && (
+              <><span className="mx-1.5 opacity-40">·</span>{extractTime(task.schedule)} МСК</>
+            )}
           </p>
         </div>
 
@@ -181,16 +396,24 @@ function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
           : task.message}
       </p>
 
-      {/* Badge + actions */}
+      {/* Badge + next fire + actions */}
       <div className="flex items-center justify-between">
-        <span className={[
-          'text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md',
-          isTask
-            ? 'bg-amber-500/10 text-amber-400'
-            : 'bg-[var(--accent)]/10 text-[var(--accent)]',
-        ].join(' ')}>
-          {isTask ? 'Автозадача' : 'Напоминание'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={[
+            'text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md',
+            isTask
+              ? 'bg-amber-500/10 text-amber-400'
+              : 'bg-[var(--accent)]/10 text-[var(--accent)]',
+          ].join(' ')}>
+            {isTask ? 'Автозадача' : 'Напоминание'}
+          </span>
+          {task.enabled && nextFire && (
+            <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+              <Play size={8} className="opacity-50" />
+              {nextFire}
+            </span>
+          )}
+        </div>
 
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -239,6 +462,7 @@ function HeartbeatFormModal({
   loading: boolean
   existingTasks: HeartbeatTask[]
 }) {
+  const [step, setStep] = useState<'template' | 'form'>('template')
   const [form, setForm] = useState<FormData>({
     name: '',
     display_name: '',
@@ -251,6 +475,7 @@ function HeartbeatFormModal({
     taskName: string
     suggestedTime: string
   } | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -264,11 +489,30 @@ function HeartbeatFormModal({
           time: extractTime(initial.schedule),
           type: initial.type,
         })
+        setStep('form')
+        setShowAdvanced(false)
       } else {
         setForm({ name: '', display_name: '', message: '', scheduleBase: 'daily', time: '10:00', type: 'reminder' })
+        setStep('template')
+        setShowAdvanced(false)
       }
     }
   }, [open, initial])
+
+  const handleTemplateSelect = (t: Template) => {
+    const autoName = t.id === 'custom'
+      ? ''
+      : t.defaults.display_name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-zа-яё0-9_]/gi, '')
+    setForm({
+      name: autoName,
+      display_name: t.defaults.display_name,
+      message: t.defaults.message,
+      scheduleBase: t.defaults.scheduleBase,
+      time: t.defaults.time,
+      type: t.defaults.type,
+    })
+    setStep('form')
+  }
 
   const isInterval = form.scheduleBase.startsWith('every')
 
@@ -290,130 +534,189 @@ function HeartbeatFormModal({
     }
   }, [form.scheduleBase, form.time, isInterval, existingTasks, initial])
 
+  // Auto-generate name from display_name
+  useEffect(() => {
+    if (!initial && form.display_name && !form.name) {
+      const auto = form.display_name
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zа-яё0-9_]/gi, '')
+      setForm(f => ({ ...f, name: auto }))
+    }
+  }, [form.display_name, initial, form.name])
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? 'Редактировать' : 'Новая автоматизация'}
+      title={initial ? 'Редактировать' : step === 'template' ? 'Новая автоматизация' : 'Настройка'}
       className="max-w-lg"
     >
-      <div className="space-y-4">
-        <Input
-          label="Системное имя"
-          placeholder="утренний_дайджест"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          disabled={!!initial}
-        />
-
-        <Input
-          label="Название (как видите вы)"
-          placeholder={form.name ? formatName(form.name) : 'Утренний дайджест'}
-          value={form.display_name}
-          onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-        />
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--text-secondary)]">Сообщение</label>
-          <textarea
-            className="w-full rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]/50 resize-none"
-            rows={3}
-            placeholder={form.type === 'task' ? 'Промпт для Claude...' : 'Текст напоминания...'}
-            value={form.message}
-            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-          />
-        </div>
-
-        {/* Type selector */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--text-secondary)]">Тип</label>
-          <div className="flex gap-2">
-            {(['reminder', 'task'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setForm((f) => ({ ...f, type: t }))}
-                className={[
-                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
-                  form.type === t
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]',
-                ].join(' ')}
-              >
-                {t === 'task' ? <Zap size={14} /> : <Bell size={14} />}
-                {t === 'task' ? 'Автозадача' : 'Напоминание'}
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-[var(--text-muted)]">
-            {form.type === 'task'
-              ? 'Агент выполнит промпт через Claude и пришлёт результат'
-              : 'Агент отправит текст напоминания как есть'}
-          </p>
-        </div>
-
-        {/* Schedule */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--text-secondary)]">Расписание</label>
-          <div className="flex flex-wrap gap-1.5">
-            {SCHEDULE_PRESETS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setForm((f) => ({ ...f, scheduleBase: p.value }))}
-                className={[
-                  'px-2.5 py-1 rounded-md text-xs transition-all',
-                  form.scheduleBase === p.value
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]',
-                ].join(' ')}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Time picker (only for non-interval) */}
-        {!isInterval && (
+      {step === 'template' && !initial ? (
+        <TemplatePicker onSelect={handleTemplateSelect} />
+      ) : (
+        <div className="space-y-4">
+          {/* Display name (primary) */}
           <Input
-            label="Время (МСК)"
-            type="time"
-            value={form.time}
-            onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+            label="Название"
+            placeholder="Например: Утренний дайджест"
+            value={form.display_name}
+            onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
           />
-        )}
 
-        {/* Conflict warning */}
-        {conflictWarning && (
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <AlertCircle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-300/90 leading-relaxed">
-              В это время уже работает «{conflictWarning.taskName}».
-              Задачи могут конкурировать за агента.{' '}
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, time: conflictWarning.suggestedTime }))}
-                className="font-medium underline hover:no-underline text-amber-300"
-              >
-                Сдвинуть на {conflictWarning.suggestedTime}
-              </button>
-            </p>
+          {/* Message */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-secondary)]">
+              {form.type === 'task' ? 'Задание для агента' : 'Текст напоминания'}
+            </label>
+            <textarea
+              className="w-full rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]/50 resize-none"
+              rows={4}
+              placeholder={form.type === 'task'
+                ? 'Опишите что агент должен сделать...\nНапример: Проанализируй задачи на сегодня и составь план действий'
+                : 'Текст, который получите в сообщении...\nНапример: Не забудь проверить задачи на сегодня!'}
+              value={form.message}
+              onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+            />
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            Отмена
-          </Button>
-          <Button
-            onClick={() => onSubmit(form)}
-            loading={loading}
-            disabled={!form.name.trim() || !form.message.trim()}
+          {/* Type selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Что делать</label>
+            <div className="flex gap-2">
+              {([
+                { value: 'reminder' as const, icon: Bell, label: 'Прислать текст', desc: 'Отправит сообщение как есть' },
+                { value: 'task' as const, icon: Zap, label: 'Выполнить задачу', desc: 'Агент обработает через AI' },
+              ]).map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setForm((f) => ({ ...f, type: t.value }))}
+                  className={[
+                    'flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border text-center transition-all',
+                    form.type === t.value
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]',
+                  ].join(' ')}
+                >
+                  <t.icon size={16} />
+                  <span className="text-xs font-medium">{t.label}</span>
+                  <span className="text-[10px] opacity-60">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Schedule: days */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Когда</label>
+            <div className="flex flex-wrap gap-1.5">
+              {SCHEDULE_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setForm((f) => ({ ...f, scheduleBase: p.value }))}
+                  className={[
+                    'px-2.5 py-1 rounded-md text-xs transition-all',
+                    form.scheduleBase === p.value
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]',
+                  ].join(' ')}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Schedule: intervals */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Или по интервалу</label>
+            <div className="flex flex-wrap gap-1.5">
+              {INTERVAL_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setForm((f) => ({ ...f, scheduleBase: p.value }))}
+                  className={[
+                    'px-2.5 py-1 rounded-md text-xs transition-all',
+                    form.scheduleBase === p.value
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]',
+                  ].join(' ')}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time picker (only for non-interval) */}
+          {!isInterval && (
+            <Input
+              label="Время (МСК)"
+              type="time"
+              value={form.time}
+              onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+            />
+          )}
+
+          {/* Conflict warning */}
+          {conflictWarning && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertCircle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-300/90 leading-relaxed">
+                В это время уже работает «{conflictWarning.taskName}».{' '}
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, time: conflictWarning.suggestedTime }))}
+                  className="font-medium underline hover:no-underline text-amber-300"
+                >
+                  Сдвинуть на {conflictWarning.suggestedTime}
+                </button>
+              </p>
+            </div>
+          )}
+
+          {/* Advanced toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
-            {initial ? 'Сохранить' : 'Создать'}
-          </Button>
+            <ChevronDown size={12} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            Дополнительно
+          </button>
+
+          {showAdvanced && (
+            <Input
+              label="Системное имя (ID)"
+              placeholder="утренний_дайджест"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              disabled={!!initial}
+            />
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-2">
+            {!initial && step === 'form' && (
+              <Button variant="ghost" onClick={() => setStep('template')} disabled={loading} size="sm">
+                Назад к шаблонам
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="ghost" onClick={onClose} disabled={loading}>
+                Отмена
+              </Button>
+              <Button
+                onClick={() => onSubmit(form)}
+                loading={loading}
+                disabled={!form.display_name.trim() || !form.message.trim()}
+              >
+                {initial ? 'Сохранить' : 'Создать'}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </Modal>
   )
 }
@@ -434,7 +737,7 @@ export function HeartbeatPage() {
       const data = await listHeartbeats()
       setTasks(data)
     } catch {
-      toast('Не удалось загрузить напоминания', 'error')
+      toast('Не удалось загрузить автоматизации', 'error')
     } finally {
       setLoading(false)
     }
@@ -453,7 +756,6 @@ export function HeartbeatPage() {
   }
 
   const handleToggle = async (name: string, enabled: boolean) => {
-    // Optimistic update
     setTasks((prev) => prev.map((t) => t.name === name ? { ...t, enabled } : t))
     try {
       await updateHeartbeat(name, { enabled })
@@ -481,6 +783,11 @@ export function HeartbeatPage() {
         ? data.scheduleBase
         : `${data.scheduleBase} ${data.time}`
 
+      // Auto-generate name if empty
+      const name = data.name.trim()
+        || data.display_name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-zа-яё0-9_]/gi, '')
+        || `task_${Date.now()}`
+
       if (editing) {
         await updateHeartbeat(editing.name, {
           display_name: data.display_name.trim() || null,
@@ -491,13 +798,13 @@ export function HeartbeatPage() {
         toast('Обновлено', 'success')
       } else {
         await createHeartbeat({
-          name: data.name.trim().replace(/\s+/g, '_'),
+          name: name.replace(/\s+/g, '_'),
           display_name: data.display_name.trim() || undefined,
           message: data.message,
           schedule,
           type: data.type,
         })
-        toast('Создано', 'success')
+        toast('Автоматизация создана', 'success')
       }
       setModalOpen(false)
       load()
@@ -540,18 +847,21 @@ export function HeartbeatPage() {
     )
   }
 
+  const activeTasks = tasks.filter(t => t.enabled)
+  const autoTasks = tasks.filter(t => t.type === 'task')
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
-              <Heart size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl liquid-glass-btn !transform-none flex items-center justify-center">
+              <CalendarCheck size={20} className="text-[var(--accent)]" />
             </div>
             <div>
               <h1 className="text-lg font-semibold text-[var(--text-primary)]">Автоматизации</h1>
-              <p className="text-xs text-[var(--text-muted)]">Напоминания и автозадачи по расписанию</p>
+              <p className="text-xs text-[var(--text-muted)]">Агент выполняет задачи по расписанию</p>
             </div>
           </div>
           {tasks.length > 0 && (
@@ -560,6 +870,17 @@ export function HeartbeatPage() {
             </Button>
           )}
         </div>
+
+        {/* Explainer (show when few tasks) */}
+        {tasks.length > 0 && tasks.length <= 2 && (
+          <div className="mb-4 px-3 py-2.5 rounded-xl liquid-glass !border-[var(--accent)]/10">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              <strong className="text-[var(--text-primary)]">Как это работает:</strong>{' '}
+              <span className="text-[var(--accent)]">Напоминание</span> — отправляет текст как есть.{' '}
+              <span className="text-amber-400">Автозадача</span> — агент обработает задание через AI и пришлёт результат.
+            </p>
+          </div>
+        )}
 
         {/* Content */}
         {tasks.length === 0 ? (
@@ -589,9 +910,9 @@ export function HeartbeatPage() {
           >
             <span>{tasks.length} {tasks.length === 1 ? 'задача' : tasks.length < 5 ? 'задачи' : 'задач'}</span>
             <span className="opacity-40">·</span>
-            <span>{tasks.filter((t) => t.enabled).length} активных</span>
+            <span>{activeTasks.length} активных</span>
             <span className="opacity-40">·</span>
-            <span>{tasks.filter((t) => t.type === 'task').length} автозадач</span>
+            <span>{autoTasks.length} автозадач</span>
           </motion.div>
         )}
       </div>

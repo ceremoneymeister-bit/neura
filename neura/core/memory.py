@@ -263,7 +263,10 @@ class MemoryStore:
                 f"search_memory_latency_ms={dt_ms:.1f} mode=ilike "
                 f"capsule={capsule_id} hits={len(rows)}"
             )
-            return [r["content"] for r in rows]
+            results = [r["content"] for r in rows]
+            for c in results:
+                asyncio.create_task(self._bump_memory_hit(capsule_id, c))
+            return results
 
         # pgvector cosine: rows with NULL embedding are excluded automatically
         rows = await self._pool.fetch(
@@ -277,12 +280,22 @@ class MemoryStore:
             f"search_memory_latency_ms={dt_ms:.1f} mode=cosine "
             f"capsule={capsule_id} hits={len(rows)}"
         )
-        return [r["content"] for r in rows]
+        results = [r["content"] for r in rows]
+        for c in results:
+            asyncio.create_task(self._bump_memory_hit(capsule_id, c))
+        return results
 
     # === Learnings & Corrections ===
 
     async def add_learning(self, capsule_id: str, content: str) -> int:
-        """Add a learning entry."""
+        """Add a learning entry with embedding for wisdom graduation."""
+        embedding = await _embed_text(content, is_query=False)
+        if embedding:
+            return await self._pool.fetchval(
+                """INSERT INTO learnings (capsule_id, type, content, embedding)
+                   VALUES ($1, 'learning', $2, $3::vector) RETURNING id""",
+                capsule_id, content, _vec_to_pg_literal(embedding),
+            )
         return await self._pool.fetchval(
             """INSERT INTO learnings (capsule_id, type, content)
                VALUES ($1, 'learning', $2) RETURNING id""",
@@ -316,6 +329,163 @@ class MemoryStore:
             capsule_id, limit,
         )
         return [r["content"] for r in rows]
+
+    # === Behavioral Rules (L1 — graduated wisdom) ===
+
+    async def get_behavioral_rules(self, capsule_id: str,
+                                    limit: int = 10) -> list[str]:
+        """Get active behavioral rules (graduated from recurring learnings)."""
+        rows = await self._pool.fetch(
+            """SELECT rule FROM behavioral_rules
+               WHERE capsule_id = $1 AND active = true
+               ORDER BY occurrence_count DESC LIMIT $2""",
+            capsule_id, limit,
+        )
+        return [r["rule"] for r in rows]
+
+    # === Knowledge Graph ===
+
+    async def add_triple(self, capsule_id: str, subject: str,
+                         predicate: str, object_: str,
+                         source: str | None = None) -> int:
+        """Add a temporal triple to the knowledge graph."""
+        return await self._pool.fetchval(
+            """INSERT INTO knowledge_graph
+               (capsule_id, subject, predicate, object, source)
+               VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+            capsule_id, subject, predicate, object_, source,
+        )
+
+    async def invalidate_triple(self, capsule_id: str, fact_id: int) -> None:
+        """Soft-delete a fact by setting valid_to = NOW()."""
+        await self._pool.execute(
+            """UPDATE knowledge_graph SET valid_to = NOW()
+               WHERE id = $1 AND capsule_id = $2""",
+            fact_id, capsule_id,
+        )
+
+    async def search_knowledge_graph(self, capsule_id: str, query: str,
+                                      limit: int = 5) -> list[dict]:
+        """Search active knowledge graph triples by subject/object keyword."""
+        words = [w for w in query.lower().split() if len(w) > 3]
+        if not words:
+            return []
+        # Search across top-3 keywords
+        results = []
+        seen = set()
+        for word in words[:3]:
+            pattern = f"%{word}%"
+            rows = await self._pool.fetch(
+                """SELECT id, subject, predicate, object, valid_from
+                   FROM knowledge_graph
+                   WHERE capsule_id = $1 AND valid_to IS NULL
+                   AND (LOWER(subject) LIKE $2 OR LOWER(object) LIKE $2)
+                   ORDER BY created_at DESC LIMIT $3""",
+                capsule_id, pattern, limit,
+            )
+            for r in rows:
+                if r["id"] not in seen:
+                    seen.add(r["id"])
+                    results.append({
+                        "subject": r["subject"],
+                        "predicate": r["predicate"],
+                        "object": r["object"],
+                        "since": r["valid_from"].isoformat() if r["valid_from"] else "",
+                    })
+        return results[:limit]
+
+    # === Wisdom Graduation ===
+
+    async def graduate_wisdom(self, capsule_id: str) -> list[str]:
+        """Graduate recurring learnings (2+ days) to behavioral rules.
+
+        Finds learnings with similar content that appeared on different days,
+        and promotes them to permanent behavioral rules.
+        """
+        # Get all learnings with embeddings
+        rows = await self._pool.fetch(
+            """SELECT id, content, created_at, embedding
+               FROM learnings
+               WHERE capsule_id = $1 AND type = 'learning'
+               AND embedding IS NOT NULL
+               ORDER BY created_at DESC""",
+            capsule_id,
+        )
+        if len(rows) < 2:
+            return []
+
+        # Group similar learnings by cosine similarity
+        # Use SQL for pairwise comparison (more efficient for small sets)
+        candidates = await self._pool.fetch(
+            """SELECT l1.content, COUNT(DISTINCT DATE(l1.created_at)) as days,
+                      MIN(l1.created_at) as first_seen
+               FROM learnings l1
+               JOIN learnings l2 ON l1.capsule_id = l2.capsule_id
+                   AND l1.id != l2.id
+                   AND l1.embedding IS NOT NULL AND l2.embedding IS NOT NULL
+                   AND (l1.embedding <=> l2.embedding) < 0.15
+               WHERE l1.capsule_id = $1 AND l1.type = 'learning'
+               GROUP BY l1.content
+               HAVING COUNT(DISTINCT DATE(l1.created_at)) >= 2""",
+            capsule_id,
+        )
+
+        graduated = []
+        for row in candidates:
+            content = row["content"]
+            # Check if already graduated
+            existing = await self._pool.fetchval(
+                """SELECT COUNT(*) FROM behavioral_rules
+                   WHERE capsule_id = $1 AND rule = $2""",
+                capsule_id, content,
+            )
+            if existing > 0:
+                continue
+
+            embedding = await _embed_text(content, is_query=False)
+            if embedding:
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count,
+                        first_seen, embedding)
+                       VALUES ($1, $2, $3, $4, $5, $6::vector)""",
+                    capsule_id, content, content, row["days"],
+                    row["first_seen"],
+                    _vec_to_pg_literal(embedding),
+                )
+            else:
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count,
+                        first_seen)
+                       VALUES ($1, $2, $3, $4, $5)""",
+                    capsule_id, content, content, row["days"],
+                    row["first_seen"],
+                )
+            graduated.append(content)
+            logger.info(f"Graduated wisdom for {capsule_id}: {content[:80]}...")
+
+        return graduated
+
+    # === Layered memory (L1) ===
+
+    async def get_l1_memory(self, capsule_id: str) -> list[str]:
+        """Get L1 (critical) memory entries — always loaded."""
+        rows = await self._pool.fetch(
+            """SELECT content FROM memory
+               WHERE capsule_id = $1 AND layer = 'L1'
+               ORDER BY hit_count DESC""",
+            capsule_id,
+        )
+        return [r["content"] for r in rows]
+
+    async def _bump_memory_hit(self, capsule_id: str, content: str) -> None:
+        """Increment hit_count and update last_hit for matched memory."""
+        await self._pool.execute(
+            """UPDATE memory SET hit_count = hit_count + 1, last_hit = NOW()
+               WHERE capsule_id = $1 AND content = $2""",
+            capsule_id, content,
+        )
 
     # === Vector search ===
 
@@ -369,6 +539,30 @@ class MemoryStore:
         learnings = await self.get_learnings(capsule_id)
         corrections = await self.get_corrections(capsule_id)
 
+        # Layered loading (if enabled in capsule config)
+        layered = capsule.config.memory.get("layered_loading", False)
+        behavioral_rules_text = ""
+        knowledge_graph_text = ""
+
+        if layered:
+            # L1: behavioral rules + critical memory
+            rules = await self.get_behavioral_rules(capsule_id)
+            l1_mem = await self.get_l1_memory(capsule_id)
+            all_l1 = rules + l1_mem
+            if all_l1:
+                behavioral_rules_text = "\n".join(f"• {r}" for r in all_l1)
+
+            # L3: knowledge graph (on-demand, query-driven)
+            if capsule.config.memory.get("knowledge_graph", False):
+                kg_triples = await self.search_knowledge_graph(
+                    capsule_id, user_prompt)
+                if kg_triples:
+                    knowledge_graph_text = "\n".join(
+                        f"• {t['subject']} → {t['predicate']} → {t['object']}"
+                        + (f" (с {t['since'][:10]})" if t.get('since') else "")
+                        for t in kg_triples
+                    )
+
         # Vector search — find relevant files in capsule's own index
         vector_context = self._vector_search(capsule, user_prompt)
         if vector_context:
@@ -399,11 +593,13 @@ class MemoryStore:
 
         return ContextParts(
             system_prompt=capsule.get_system_prompt(),
+            behavioral_rules=behavioral_rules_text,
             today_diary=today_text,
             recent_diary=recent_text,
             memory="\n".join(memory) if memory else "",
             learnings="\n".join(learnings) if learnings else "",
             corrections="\n".join(corrections) if corrections else "",
+            knowledge_graph=knowledge_graph_text,
         )
 
     async def _search_diary_for_context(self, capsule_id: str, user_prompt: str,

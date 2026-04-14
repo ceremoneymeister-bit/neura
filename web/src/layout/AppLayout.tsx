@@ -8,7 +8,7 @@ import { ImageLightbox } from '@/components/chat/MessageBubble'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export function AppLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
   const { id: chatId } = useParams<{ id?: string }>()
   const [chatTitle, setChatTitle] = useState<string | null>(null)
 
@@ -48,9 +48,9 @@ export function AppLayout() {
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 260, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
             className="hidden md:flex flex-col overflow-hidden shrink-0 border-r border-[var(--border)]/40"
-            style={{ minWidth: 0, maxWidth: 260 }}
+            style={{ minWidth: 0, maxWidth: 260, willChange: 'width, opacity' }}
           >
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </motion.div>
@@ -66,18 +66,19 @@ export function AppLayout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.12 }}
           >
             <div
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
               onClick={() => setSidebarOpen(false)}
             />
             <motion.div
-              className="relative z-50 flex flex-col w-[min(260px,85vw)] bg-[var(--bg-sidebar)] border-r border-[var(--border)]/40"
-              initial={{ x: -260 }}
+              className="relative z-50 flex flex-col w-[min(300px,85vw)] bg-[var(--bg-sidebar)] shadow-[4px_0_24px_rgba(0,0,0,0.3)]"
+              style={{ willChange: 'transform', backfaceVisibility: 'hidden' }}
+              initial={{ x: -300 }}
               animate={{ x: 0 }}
-              exit={{ x: -260 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              exit={{ x: -300 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             >
               <Sidebar onClose={() => setSidebarOpen(false)} />
             </motion.div>
@@ -88,15 +89,15 @@ export function AppLayout() {
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Top bar */}
-        <div className="flex items-center gap-2 px-3 h-11 shrink-0">
+        <div className="flex items-center gap-2 px-3 h-12 md:h-11 shrink-0">
           {/* Show sidebar toggle ONLY when sidebar is hidden */}
           {!sidebarOpen && (
             <button
               onClick={toggleSidebar}
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              className="p-3 md:p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 liquid-glass-nav"
               title="Открыть панель (Ctrl+B)"
             >
-              <PanelLeft size={16} />
+              <PanelLeft size={22} className="md:w-5 md:h-5" />
             </button>
           )}
 

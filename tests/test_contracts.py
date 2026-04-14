@@ -98,6 +98,7 @@ class TestMemoryToContext:
             [memory_row],         # search_memory
             [learning_row],       # get_learnings
             [],                   # get_corrections
+            [],                   # search_diary (archive search)
         ])
         store = MemoryStore(pool)
         parts = await store.build_context_parts(capsule, "test")

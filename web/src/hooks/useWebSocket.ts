@@ -3,12 +3,30 @@ import { wsUrl } from '@/api/client'
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+export interface ToolStep {
+  tool_id: string
+  tool: string       // "Read", "Edit", "Bash", etc.
+  label: string      // "📖 Читаю · core/engine.py"
+  detail?: {
+    file?: string
+    command?: string
+    pattern?: string
+    query?: string
+    path?: string
+  }
+  status: 'running' | 'done'
+  startedAt: number  // Date.now()
+}
+
 export interface WsChunk {
-  type: 'status' | 'text' | 'tool' | 'done' | 'error' | 'busy' | 'ping'
+  type: 'status' | 'text' | 'tool' | 'tool_start' | 'tool_end' | 'done' | 'error' | 'busy' | 'ping'
   content: string
   model?: string
   duration?: number
   active_chats?: number[]
+  tool?: string
+  tool_id?: string
+  detail?: ToolStep['detail']
 }
 
 interface UseWebSocketOptions {

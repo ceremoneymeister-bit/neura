@@ -153,6 +153,18 @@ textarea:focus-visible,
   outline: none;
   box-shadow: none;
 }
+.liquid-glass-input *:focus-visible,
+.liquid-glass-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Prevent iOS Safari zoom on input focus (requires font-size >= 16px) */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
 
 /* Animations */
 @keyframes fade-in {
@@ -188,10 +200,19 @@ textarea:focus-visible,
 }
 
 /* Fix #31: Unified animation timing — 150ms standard, ease-out default */
-.animate-fade-in    { animation: fade-in 150ms ease-out both; }
-.animate-slide-left { animation: slide-in-left 150ms ease-out both; }
-.cursor-blink       { animation: blink 1.5s step-end infinite; }  /* Fix #32: sync with shimmer 1.5s */
+.animate-fade-in    { animation: fade-in 150ms ease-out both; will-change: opacity, transform; }
+.animate-slide-left { animation: slide-in-left 150ms ease-out both; will-change: opacity, transform; }
+.cursor-blink       { animation: blink 1.5s step-end infinite; }
 .pulse-ring         { animation: pulse-ring 1.5s ease-out infinite; }
+
+/* Anti-flicker for animated/glass elements (NO transform — breaks fixed positioning inside) */
+.liquid-glass,
+.liquid-glass-btn,
+.liquid-glass-input,
+.liquid-glass-popup {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
 
 .skeleton {
   background: linear-gradient(
@@ -222,6 +243,207 @@ textarea:focus-visible,
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* ── Liquid Glass (iOS 26 style) ─────────────────────────── */
+
+/* Base: container/card */
+.liquid-glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.02) 35%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Button variant */
+.liquid-glass-btn {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.liquid-glass-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 45%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+.liquid-glass-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  transform: translateY(-0.5px);
+}
+.liquid-glass-btn:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Input variant */
+.liquid-glass-input {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.liquid-glass-input:focus-within {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Dropdown/popup variant */
+.liquid-glass-popup {
+  position: relative;
+  overflow: hidden;
+  background: rgba(30, 30, 28, 0.82);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.liquid-glass-popup::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 25%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Nav item — subtle glass for sidebar */
+.liquid-glass-nav {
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 150ms ease;
+}
+.liquid-glass-nav:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.liquid-glass-nav.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Light theme overrides ──────────────────────────────── */
+[data-theme="light"] .liquid-glass {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02),
+    0 2px 12px rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .liquid-glass::before {
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.08) 35%,
+    transparent 100%
+  );
+}
+
+[data-theme="light"] .liquid-glass-btn {
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .liquid-glass-btn::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    transparent 45%
+  );
+}
+[data-theme="light"] .liquid-glass-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .liquid-glass-input {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .liquid-glass-popup {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .liquid-glass-nav:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .liquid-glass-nav.active {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
 .transition-smooth {
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -244,38 +466,70 @@ textarea:focus-visible,
 
 /* ── Markdown prose (inside chat messages) ──────────────────── */
 .prose-neura {
-  line-height: 1.65;
+  line-height: 1.75;
+  letter-spacing: -0.003em;
   word-break: break-word;
   overflow-wrap: anywhere;
   -webkit-user-select: text;
   user-select: text;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 .prose-neura > *:first-child { margin-top: 0 !important; }
 .prose-neura > *:last-child  { margin-bottom: 0 !important; }
 
-.prose-neura p  { margin-bottom: 0.65rem; }
-.prose-neura ul { list-style: disc;    padding-left: 1.4rem; margin-bottom: 0.65rem; }
-.prose-neura ol { list-style: decimal; padding-left: 1.4rem; margin-bottom: 0.65rem; }
-.prose-neura li { margin-bottom: 0.2rem; }
-.prose-neura li > p { margin-bottom: 0.2rem; }
+.prose-neura p  { margin-bottom: 0.85rem; }
+.prose-neura ul { list-style: disc;    padding-left: 1.5rem; margin-bottom: 0.85rem; }
+.prose-neura ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 0.85rem; }
+.prose-neura li { margin-bottom: 0.35rem; line-height: 1.7; }
+.prose-neura li > p { margin-bottom: 0.25rem; }
 
 .prose-neura h1, .prose-neura h2, .prose-neura h3,
 .prose-neura h4, .prose-neura h5, .prose-neura h6 {
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-weight: 500;
   color: var(--text-primary);
-  margin-top: 1.1rem;
-  margin-bottom: 0.4rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
 }
-.prose-neura h1 { font-size: 1.25rem; }
-.prose-neura h2 { font-size: 1.1rem;  }
-.prose-neura h3 { font-size: 1rem;    }
+.prose-neura h1 { font-size: 1.4rem; font-weight: 600; }
+.prose-neura h2 { font-size: 1.2rem; }
+.prose-neura h3 { font-size: 1.05rem; }
 
 .prose-neura hr {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 1rem 0;
+  margin: 1.5rem 0;
 }
 
 .prose-neura pre { max-width: 100%; overflow-x: auto; }
 .prose-neura strong { color: var(--text-primary); font-weight: 600; }
 .prose-neura em     { color: var(--text-secondary); font-style: italic; }
+.prose-neura a {
+  color: var(--accent-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: color 150ms;
+}
+.prose-neura a:hover { color: var(--accent); }
+
+/* Blockquote — elegant style */
+.prose-neura blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Inline code */
+.prose-neura code:not(pre code) {
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--code-inline);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-weight: 500;
+}

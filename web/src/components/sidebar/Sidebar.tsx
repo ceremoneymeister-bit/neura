@@ -13,6 +13,9 @@ import {
   Heart,
   BookOpen,
   Brain,
+  HelpCircle,
+  ArrowUpCircle,
+  LogOut,
 } from 'lucide-react'
 import { type Conversation, listConversations } from '@/api/conversations'
 import { type Project, listProjects } from '@/api/projects'
@@ -201,40 +204,40 @@ export function Sidebar({ onClose }: SidebarProps) {
   return (
     <div className="flex flex-col h-full bg-[var(--bg-sidebar)] select-none">
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="px-3 py-3 flex items-center justify-between">
-        <span className="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+      <div className="px-3 py-3.5 flex items-center justify-between">
+        <span className="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">
           {brandName}
         </span>
         <button
           onClick={onClose}
           aria-label="Скрыть панель"
           title="Скрыть панель"
-          className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] liquid-glass-nav"
         >
-          <PanelLeft size={16} />
+          <PanelLeft size={18} />
         </button>
       </div>
 
       {/* ── Nav items ───────────────────────────────────────── */}
       <nav className="px-3 pb-2 space-y-0.5">
         <NavItem
-          icon={<Plus size={18} strokeWidth={1.5} />}
+          icon={<Plus size={20} strokeWidth={1.5} />}
           label="Новый чат"
           onClick={handleNewChat}
         />
         <NavItem
-          icon={<Search size={18} strokeWidth={1.5} />}
+          icon={<Search size={20} strokeWidth={1.5} />}
           label="Поиск"
           onClick={() => setShowSearch((v) => !v)}
         />
 
         {/* Projects — split button: label → page, arrow → dropdown */}
-        <div className="flex items-center rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
+        <div className="flex items-center rounded-xl liquid-glass-nav">
           <button
             onClick={() => { navigate('/projects'); closeMobileOnly(onClose) }}
-            className="flex-1 flex items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            className="flex-1 flex items-center gap-3 px-3 py-2.5 text-[15px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
-            <FolderOpen size={18} strokeWidth={1.5} />
+            <FolderOpen size={20} strokeWidth={1.5} />
             <span>Проекты</span>
           </button>
           <button
@@ -277,17 +280,17 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         <NavItem
-          icon={<Heart size={18} strokeWidth={1.5} />}
+          icon={<Heart size={20} strokeWidth={1.5} />}
           label="Автоматизации"
           onClick={() => { navigate('/heartbeat'); closeMobileOnly(onClose) }}
         />
         <NavItem
-          icon={<BookOpen size={18} strokeWidth={1.5} />}
+          icon={<BookOpen size={20} strokeWidth={1.5} />}
           label="Дневник"
           onClick={() => { navigate('/diary'); closeMobileOnly(onClose) }}
         />
         <NavItem
-          icon={<Brain size={18} strokeWidth={1.5} />}
+          icon={<Brain size={20} strokeWidth={1.5} />}
           label="Память"
           onClick={() => { navigate('/memory'); closeMobileOnly(onClose) }}
         />
@@ -352,34 +355,95 @@ export function Sidebar({ onClose }: SidebarProps) {
 }
 
 function FooterBar({ onClose }: { onClose?: () => void }) {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
+
+  // Position popup above button using fixed coords
+  useEffect(() => {
+    if (!menuOpen || !btnRef.current) return
+    const rect = btnRef.current.getBoundingClientRect()
+    setMenuStyle({
+      position: 'fixed',
+      bottom: window.innerHeight - rect.top + 4,
+      left: rect.left,
+      width: rect.width,
+    })
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   return (
-    <div className="border-t border-[var(--border)]/40 px-3 py-2.5 flex items-center gap-2">
-      <Avatar name={user?.name ?? ''} size="sm" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-[var(--text-primary)] truncate leading-tight">
-          {user?.name ?? user?.email}
-        </p>
-        <p className="text-[10px] text-[var(--text-muted)] leading-tight">Pro</p>
-      </div>
+    <div className="border-t border-[var(--border)]/40 px-3 py-2.5">
+      {/* Profile menu popup — fixed positioning */}
+      {menuOpen && (
+        <div ref={menuRef} style={menuStyle} className="liquid-glass-popup rounded-xl py-1.5 z-[60] animate-fade-in">
+          <div className="px-3.5 py-2 text-xs text-[var(--text-muted)] truncate">
+            {user?.email}
+          </div>
+          <div className="border-t border-[var(--border)]/60 my-1" />
+          <button
+            onClick={() => { setMenuOpen(false); navigate('/settings'); closeMobileOnly(onClose) }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <Settings size={15} className="text-[var(--text-muted)]" /> Настройки
+          </button>
+          <button
+            onClick={() => { setMenuOpen(false); toggle() }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={15} className="text-[var(--text-muted)]" /> : <Moon size={15} className="text-[var(--text-muted)]" />}
+            {theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+          </button>
+          <button
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <HelpCircle size={15} className="text-[var(--text-muted)]" /> Помощь
+          </button>
+          <div className="border-t border-[var(--border)]/60 my-1" />
+          <button
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <ArrowUpCircle size={15} className="text-[var(--text-muted)]" /> Upgrade plan
+          </button>
+          <div className="border-t border-[var(--border)]/60 my-1" />
+          <button
+            onClick={() => { setMenuOpen(false); logout() }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <LogOut size={15} className="text-[var(--text-muted)]" /> Выход
+          </button>
+        </div>
+      )}
+
+      {/* Footer button */}
       <button
-        onClick={toggle}
-        title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-        aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-        className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+        ref={btnRef}
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="w-full flex items-center gap-2.5 rounded-xl px-2 py-2 liquid-glass-nav"
       >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-      </button>
-      <button
-        onClick={() => { navigate('/settings'); closeMobileOnly(onClose) }}
-        title="Настройки"
-        aria-label="Настройки"
-        className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-      >
-        <Settings size={14} />
+        <Avatar name={user?.name ?? ''} size="sm" />
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-[14px] text-[var(--text-primary)] truncate leading-tight">
+            {user?.name ?? user?.email}
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)] leading-tight">Pro</p>
+        </div>
+        <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
       </button>
     </div>
   )
@@ -400,7 +464,7 @@ function NavItem({
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded-lg transition-colors disabled:opacity-50"
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-[15px] text-[var(--text-secondary)] rounded-xl disabled:opacity-50 liquid-glass-nav"
     >
       {loading ? <Spinner size="sm" /> : icon}
       <span>{label}</span>

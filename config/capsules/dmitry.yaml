@@ -85,6 +85,9 @@ skills:
 # --- Мета ---
 - skill-creator
 memory:
+  layered_loading: true
+  knowledge_graph: true
+  wisdom_graduation: true
   diary_retention_days: 360
   max_long_term_entries: 500
   context_window:

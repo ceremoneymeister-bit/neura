@@ -28,6 +28,7 @@ DEFAULT_DIARY_CHARS = 12000
 class ContextParts:
     """Container for all context data injected into the prompt."""
     system_prompt: str = ""
+    behavioral_rules: str = ""     # L1: graduated wisdom (always loaded)
     today_diary: str = ""
     recent_diary: str = ""
     memory: str = ""
@@ -35,6 +36,7 @@ class ContextParts:
     corrections: str = ""
     conversation_history: str = ""  # Messages from THIS chat only
     cross_project_context: str = ""  # Recent activity from OTHER projects
+    knowledge_graph: str = ""      # L3: temporal facts (on-demand)
 
 
 class ContextBuilder:
@@ -62,6 +64,12 @@ class ContextBuilder:
         if parts.system_prompt:
             sections.append(self._format_section(
                 "[Правила агента]", parts.system_prompt))
+
+        # L1: Graduated behavioral rules (always loaded, high priority)
+        if parts.behavioral_rules:
+            sections.append(self._format_section(
+                "🛡️ Правила поведения (проверены практикой)",
+                self._truncate_tail(parts.behavioral_rules, 2000)))
 
         if parts.memory:
             sections.append(self._format_section(
@@ -91,6 +99,12 @@ class ContextBuilder:
             sections.append(self._format_section(
                 "⚠️ Коррекции",
                 self._truncate_tail(parts.corrections, corr_limit)))
+
+        # L3: Knowledge graph facts (temporal, on-demand)
+        if parts.knowledge_graph:
+            sections.append(self._format_section(
+                "🔗 Известные факты",
+                self._truncate_tail(parts.knowledge_graph, 1500)))
 
         # Cross-project context (recent activity from OTHER projects)
         if parts.cross_project_context:

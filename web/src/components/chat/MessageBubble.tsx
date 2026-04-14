@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Copy, Check, RefreshCw, Clock, X, Download } from 'lucide-react'
+import { Copy, Check, RefreshCw, X, Download, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import type { Message } from '@/api/conversations'
 import { CodeBlock } from './CodeBlock'
-import { NeuraIcon } from '@/components/ui/NeuraIcon'
+import { FilePreview } from './FilePreview'
 import { fileIcon } from '@/utils/time'
 import { copyToClipboard } from '@/utils/clipboard'
 
@@ -43,6 +43,11 @@ const markdownComponents: Components = {
     )
   },
   a({ href, children }) {
+    // Intercept file links → FilePreview
+    if (href?.includes('/api/files/serve/')) {
+      const filename = href.split('/').pop() ?? ''
+      return <FilePreview url={href} filename={filename} />
+    }
     return (
       <a
         href={href}
@@ -167,6 +172,150 @@ export function ImageLightbox() {
   )
 }
 
+// ── Action bar (Claude-style: hover-only, minimal) ──────────────
+
+function ActionBar({
+  onCopy,
+  copied,
+  time,
+  model,
+  duration,
+  isLast,
+  onRegenerate,
+  messageId,
+  align = 'left',
+}: {
+  onCopy: () => void
+  copied: boolean
+  time?: string | null
+  model?: string | null
+  duration?: number | null
+  tokens?: number | null
+  isLast?: boolean
+  onRegenerate?: () => void
+  messageId?: number
+  align?: 'left' | 'right'
+}) {
+  const [vote, setVote] = useState<'up' | 'down' | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+
+  const sendFeedback = useCallback(async (type: 'up' | 'down', comment?: string) => {
+    setVote(type)
+    if (type === 'up') setShowFeedback(false)
+    try {
+      const token = localStorage.getItem('neura_token')
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message_id: messageId, vote: type, comment: comment || null }),
+      })
+    } catch { /* silent */ }
+  }, [messageId])
+
+  const handleThumbDown = useCallback(() => {
+    if (vote === 'down') return
+    setShowFeedback(true)
+  }, [vote])
+
+  const submitNegative = useCallback(() => {
+    sendFeedback('down', feedbackText)
+    setShowFeedback(false)
+    setFeedbackText('')
+  }, [sendFeedback, feedbackText])
+
+  const isAssistant = align === 'left'
+
+  return (
+    <div className={`flex flex-col gap-1.5 mt-1 ${align === 'right' ? 'items-end' : 'items-start'}`}>
+      {/* Action buttons — hidden until hover on message */}
+      <div className={`flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 ${align === 'right' ? 'justify-end' : ''}`}>
+        {/* Copy */}
+        <button
+          onClick={onCopy}
+          title="Копировать"
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+        >
+          {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+        </button>
+
+        {/* Thumbs — only for assistant */}
+        {isAssistant && (
+          <>
+            <button
+              onClick={() => vote !== 'up' && sendFeedback('up')}
+              title="Хороший ответ"
+              className={`p-1.5 rounded-md transition-colors ${vote === 'up' ? 'text-green-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+            >
+              <ThumbsUp size={14} />
+            </button>
+            <button
+              onClick={handleThumbDown}
+              title="Плохой ответ"
+              className={`p-1.5 rounded-md transition-colors ${vote === 'down' ? 'text-red-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+            >
+              <ThumbsDown size={14} />
+            </button>
+          </>
+        )}
+
+        {/* Regenerate */}
+        {isLast && onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            title="Повторить"
+            className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <RefreshCw size={14} />
+          </button>
+        )}
+
+        {/* Meta — compact */}
+        {model && (
+          <span className="text-[10px] ml-2 text-[var(--text-muted)] font-mono">
+            {formatModel(model)}
+          </span>
+        )}
+        {duration != null && (
+          <span className="text-[10px] text-[var(--text-muted)]">{duration.toFixed(1)}s</span>
+        )}
+        {time && (
+          <span className="text-[10px] text-[var(--text-muted)] ml-1">{time}</span>
+        )}
+      </div>
+
+      {/* Negative feedback form */}
+      {showFeedback && (
+        <div className="flex gap-2 items-end w-full max-w-md animate-fade-in">
+          <input
+            type="text"
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitNegative()}
+            placeholder="Что не так с ответом?"
+            autoFocus
+            className="flex-1 text-sm px-3 py-1.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
+          />
+          <button
+            onClick={submitNegative}
+            className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/30 transition-colors"
+          >
+            Отправить
+          </button>
+          <button
+            onClick={() => { setShowFeedback(false); setFeedbackText('') }}
+            className="text-xs px-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Message bubble ──────────────────────────────────────────────
+
 export function MessageBubble({ message, isLast = false, onRegenerate }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const isUser = message.role === 'user'
@@ -179,9 +328,9 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
 
   if (isUser) {
     return (
-      <div className="group flex justify-end px-4 py-3 animate-fade-in will-change-transform">
-        <div className="flex flex-col items-end gap-1 max-w-[88%] min-w-0">
-          <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words bg-[var(--accent)]/15 border border-[var(--accent)]/25 text-[var(--text-primary)]">
+      <div className="group/msg flex justify-end px-4 py-3 animate-fade-in will-change-transform">
+        <div className="flex flex-col items-end gap-0 max-w-[88%] min-w-0">
+          <div className="relative px-4 py-2.5 rounded-2xl text-[15px] leading-[1.7] break-words bg-[var(--bg-hover)] text-[var(--text-primary)]">
             {message.files && message.files.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {message.files.map((f, i) => (
@@ -197,64 +346,22 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
             <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-row-reverse hover-hide">
-            <button
-              onClick={handleCopy}
-              title="Копировать"
-              className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--bg-hover)]"
-            >
-              {copied ? <Check size={11} /> : <Copy size={11} />}
-            </button>
-            {message.created_at && (
-              <span className="flex items-center gap-0.5 text-[10px] text-[var(--text-muted)]">
-                <Clock size={9} />
-                {formatTime(message.created_at)}
-              </span>
-            )}
-          </div>
+          <ActionBar
+            onCopy={handleCopy}
+            copied={copied}
+            time={formatTime(message.created_at)}
+            messageId={message.id}
+            align="right"
+          />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="group relative flex gap-3 px-4 py-3 animate-fade-in will-change-transform">
-      <div className="shrink-0 mt-0.5 select-none">
-        <NeuraIcon size={28} />
-      </div>
-
-      <div className="flex flex-col gap-1 max-w-[88%] min-w-0 items-start">
-        <div className="relative px-4 py-3 rounded-xl text-sm leading-relaxed break-words overflow-hidden bg-[var(--bg-card)] border border-[var(--border)] border-l-2 border-l-[var(--accent)]/30 text-[var(--text-primary)]">
-          <div className="absolute -top-7 right-0 z-10 flex items-center gap-1 hover-hide bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-1.5 py-0.5 shadow-lg">
-            <button
-              onClick={handleCopy}
-              title="Копировать"
-              className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--border)]"
-            >
-              {copied ? <Check size={11} /> : <Copy size={11} />}
-            </button>
-            {isLast && onRegenerate && (
-              <button
-                onClick={onRegenerate}
-                title="Перегенерировать"
-                className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded hover:bg-[var(--border)]"
-              >
-                <RefreshCw size={11} />
-              </button>
-            )}
-            {message.created_at && (
-              <span className="flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] px-1">
-                <Clock size={9} />
-                {formatTime(message.created_at)}
-              </span>
-            )}
-            {message.duration_sec != null && (
-              <span className="text-[10px] text-[var(--text-muted)]">
-                {message.duration_sec.toFixed(1)}s
-              </span>
-            )}
-          </div>
-
+    <div className="group/msg flex px-4 py-3 animate-fade-in will-change-transform">
+      <div className="flex flex-col gap-0 max-w-[min(720px,100%)] min-w-0 items-start">
+        <div className="relative py-1 text-[15px] leading-[1.7] break-words overflow-hidden text-[var(--text-primary)]">
           {message.files && message.files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {message.files.map((f, i) => (
@@ -273,23 +380,18 @@ export function MessageBubble({ message, isLast = false, onRegenerate }: Message
               {message.content}
             </ReactMarkdown>
           </div>
-
-          {(message.model || message.duration_sec != null || message.tokens_used != null) && (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border)]/50">
-              {message.model && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-mono">
-                  {formatModel(message.model)}
-                </span>
-              )}
-              {message.duration_sec != null && (
-                <span className="text-[10px] text-[var(--text-muted)]">{message.duration_sec.toFixed(1)}s</span>
-              )}
-              {message.tokens_used != null && (
-                <span className="text-[10px] text-[var(--text-muted)]">{message.tokens_used} tok</span>
-              )}
-            </div>
-          )}
         </div>
+
+        <ActionBar
+          onCopy={handleCopy}
+          copied={copied}
+          time={formatTime(message.created_at)}
+          model={message.model}
+          duration={message.duration_sec}
+          messageId={message.id}
+          isLast={isLast}
+          onRegenerate={onRegenerate}
+        />
       </div>
     </div>
   )

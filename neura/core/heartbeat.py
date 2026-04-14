@@ -58,8 +58,14 @@ class HeartbeatTask:
     schedule: str
     capsule_id: str
     owner_telegram_id: int
+    recipient_telegram_id: int | None = None  # Override: send to this ID instead of owner
     enabled: bool = True
     task_type: str = "reminder"  # "reminder" | "task"
+
+    @property
+    def target_telegram_id(self) -> int:
+        """Actual recipient: explicit override or owner."""
+        return self.recipient_telegram_id if self.recipient_telegram_id else self.owner_telegram_id
 
 
 def parse_heartbeat_config(capsule_id: str, owner_telegram_id: int,
@@ -76,6 +82,7 @@ def parse_heartbeat_config(capsule_id: str, owner_telegram_id: int,
             schedule=item.get("schedule", "daily 10:00"),
             capsule_id=capsule_id,
             owner_telegram_id=owner_telegram_id,
+            recipient_telegram_id=item.get("recipient_telegram_id"),
             enabled=item.get("enabled", True),
             task_type=item.get("type", "reminder"),
         ))
@@ -232,11 +239,11 @@ class HeartbeatEngine:
                 # Fire!
                 if task.task_type == "task" and self._run_task:
                     await self._run_task(
-                        task.capsule_id, task.owner_telegram_id, task.name, task.message
+                        task.capsule_id, task.target_telegram_id, task.name, task.message
                     )
                 else:
                     await self._send(
-                        task.capsule_id, task.owner_telegram_id, task.message
+                        task.capsule_id, task.target_telegram_id, task.message
                     )
                 await self._redis.set(
                     dedup_key, str(now.timestamp()), ex=7 * 86400

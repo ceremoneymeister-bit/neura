@@ -14,6 +14,7 @@ Uploads: user files saved to homes/<capsule>/uploads/ (persistent across session
 import asyncio
 import logging
 import os
+import re
 import tempfile
 import time as _time
 from collections import defaultdict
@@ -155,6 +156,61 @@ class StreamingResponder:
         self._response_msg = None
 
 
+# ── Auto-extraction of facts from conversations ──────────────
+
+# Patterns for automatic fact extraction
+_EMAIL_RE = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+')
+_URL_RE = re.compile(r'https?://[^\s<>\]"\')+]+')
+_PHONE_RE = re.compile(r'(?:\+7|8)[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}')
+_GOOGLE_SHEET_RE = re.compile(r'https://docs\.google\.com/spreadsheets/d/([a-zA-Z0-9_-]+)')
+_GOOGLE_DOC_RE = re.compile(r'https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)')
+
+# Keywords that signal important facts worth saving
+_IMPORTANT_KEYWORDS = {
+    'ru': ['пароль', 'логин', 'доступ', 'ключ', 'токен', 'api', 'email',
+           'почта', 'адрес', 'телефон', 'ссылк', 'таблиц', 'документ',
+           'договор', 'контракт', 'дедлайн', 'крайний срок', 'бюджет',
+           'цена', 'стоимость', 'зарплат', 'оплат'],
+}
+
+
+def _auto_extract_facts(user_msg: str, bot_response: str) -> list[str]:
+    """Extract structured facts from conversation for long-term memory.
+
+    Returns list of fact strings to save. Keeps only high-signal data:
+    emails, links to shared resources, phone numbers.
+    Avoids noise by requiring facts to appear in both user message context
+    and bot response (confirmation pattern).
+    """
+    facts: list[str] = []
+    combined = f"{user_msg}\n{bot_response}"
+
+    # 1. Extract emails mentioned in conversation
+    emails = set(_EMAIL_RE.findall(combined))
+    # Filter out common service emails
+    service_domains = {'noreply', 'no-reply', 'mailer-daemon', 'postmaster'}
+    for email in emails:
+        local = email.split('@')[0].lower()
+        if local not in service_domains and 'example' not in email:
+            facts.append(f"Email упомянут в разговоре: {email}")
+
+    # 2. Extract Google Sheets/Docs links (high-value shared resources)
+    for match in _GOOGLE_SHEET_RE.finditer(combined):
+        url = match.group(0)
+        facts.append(f"Google Таблица: {url}")
+    for match in _GOOGLE_DOC_RE.finditer(combined):
+        url = match.group(0)
+        facts.append(f"Google Документ: {url}")
+
+    # 3. Extract phone numbers
+    phones = set(_PHONE_RE.findall(combined))
+    for phone in phones:
+        facts.append(f"Телефон упомянут: {phone}")
+
+    # Deduplicate
+    return list(dict.fromkeys(facts))
+
+
 # ── Telegram Transport ─────────────────────────────────────────
 
 class TelegramTransport:
@@ -225,8 +281,10 @@ class TelegramTransport:
             self._apps.append(app)
 
         started = 0
+        failed_apps = []
         for app in self._apps:
-            capsule_id = app.bot_data.get("capsule", {})
+            cap = app.bot_data.get("capsule")
+            capsule_id = getattr(cap, "id", "?") if cap else "?"
             try:
                 await app.initialize()
                 await app.updater.start_polling(
@@ -236,10 +294,43 @@ class TelegramTransport:
                 await app.start()
                 started += 1
             except Exception as e:
-                logger.error(f"Failed to start bot (will skip): {e}")
-                # Don't crash entire service if one bot fails to initialize
+                logger.error(f"Failed to start bot {capsule_id} (will retry): {e}")
+                failed_apps.append(app)
 
         logger.info(f"Telegram transport started: {started}/{len(self._apps)} bot(s)")
+
+        # Background retry for bots that failed (e.g. DNS was down at startup)
+        if failed_apps:
+            asyncio.create_task(self._retry_failed_bots(failed_apps))
+
+    async def _retry_failed_bots(self, failed_apps: list, max_retries: int = 10) -> None:
+        """Retry starting bots that failed during initial startup."""
+        delay = 30  # start with 30s, double each attempt up to 5min
+        for attempt in range(1, max_retries + 1):
+            await asyncio.sleep(delay)
+            still_failed = []
+            for app in failed_apps:
+                cap = app.bot_data.get("capsule")
+                capsule_id = getattr(cap, "id", "?") if cap else "?"
+                try:
+                    await app.initialize()
+                    await app.updater.start_polling(
+                        drop_pending_updates=True,
+                        allowed_updates=["message", "callback_query"],
+                    )
+                    await app.start()
+                    logger.info(f"Bot {capsule_id} started on retry #{attempt}")
+                except Exception as e:
+                    logger.warning(f"Bot {capsule_id} retry #{attempt} failed: {e}")
+                    still_failed.append(app)
+            if not still_failed:
+                logger.info(f"All failed bots recovered after {attempt} retries")
+                return
+            failed_apps = still_failed
+            delay = min(delay * 2, 300)  # cap at 5 minutes
+        # After all retries exhausted
+        capsule_ids = [getattr(a.bot_data.get("capsule"), "id", "?") for a in failed_apps]
+        logger.error(f"Bots permanently failed after {max_retries} retries: {capsule_ids}")
 
     async def stop(self) -> None:
         for app in reversed(self._apps):
@@ -1398,13 +1489,22 @@ class TelegramTransport:
                 prefixes.append(str(Path(home).resolve()) + "/")
             response = ResponseParser.parse(accumulated_text, allowed_prefixes=prefixes)
 
-            # 4. Save learnings/corrections/rules
+            # 4. Save learnings/corrections/rules/memory/facts
             for learn in response.learnings:
                 await self._memory.add_learning(cap_id, learn)
             for corr in response.corrections:
                 await self._memory.add_correction(cap_id, corr)
             for rule in response.rules:
                 self._append_user_rule(home, rule)
+            for mem in response.memory_entries:
+                await self._memory.add_memory(cap_id, mem, source="agent")
+            for subj, pred, obj in response.facts:
+                await self._memory.add_triple(cap_id, subj, pred, obj, source="agent")
+
+            # 4a. Auto-extract facts from conversation
+            auto_mem = _auto_extract_facts(incoming.text, accumulated_text)
+            for mem in auto_mem:
+                await self._memory.add_memory(cap_id, mem, source="auto")
 
             # 5. Rate warning
             if warn_rate:
