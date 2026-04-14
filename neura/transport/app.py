@@ -19,6 +19,9 @@ from pathlib import Path
 
 from neura.core.capsule import Capsule
 from neura.core.engine import ClaudeEngine
+from neura.core.opencode_engine import OpenCodeEngine
+from neura.core.yandex_engine import YandexEngine
+from neura.core.engine_router import EngineRouter
 from neura.core.memory import MemoryStore
 from neura.core.queue import RequestQueue
 from neura.core.skills import SkillRegistry
@@ -61,6 +64,35 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
 
     # 3. Core services
     engine = ClaudeEngine()
+
+    # 3a. OpenCode engine (fallback)
+    opencode_engine = None
+    try:
+        opencode_engine = OpenCodeEngine()
+        logger.info("OpenCode engine initialized (fallback available)")
+    except RuntimeError as e:
+        logger.warning(f"OpenCode engine not available: {e}")
+
+    # 3b. YandexGPT engine (optional third engine)
+    yandex_engine = None
+    try:
+        ye = YandexEngine()
+        if ye.is_available():
+            yandex_engine = ye
+            logger.info("YandexGPT engine initialized")
+        else:
+            logger.info("YandexGPT engine not configured (set YANDEX_API_KEY + YANDEX_FOLDER_ID)")
+    except Exception as e:
+        logger.warning(f"YandexGPT engine not available: {e}")
+
+    # 3c. Engine router (multi-engine with auto-fallback)
+    # Note: metrics attached later after monitoring init (step 6)
+    engine_router = EngineRouter(
+        claude_engine=engine,
+        opencode_engine=opencode_engine,
+        yandex_engine=yandex_engine,
+    )
+
     memory = MemoryStore(db.pool)
     queue = RequestQueue(cache.redis)
 
@@ -94,6 +126,9 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
 
     # 6. Monitoring
     monitoring = await setup_monitoring(db.pool, cache.redis, capsules)
+
+    # 6a. Attach metrics to engine router for token/cost tracking
+    engine_router._metrics = monitoring["metrics"]
 
     # 6b. Skill learning
     skill_collector = SkillUsageCollector(db.pool)
@@ -209,6 +244,7 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         alert_sender=monitoring["alert_sender"],
         skill_collector=skill_collector,
         skill_evolver=skill_evolver,
+        engine_router=engine_router,
     )
     transport.set_onboarding(cache.redis)
 
@@ -219,6 +255,8 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
         "db": db,
         "cache": cache,
         "engine": engine,
+        "opencode_engine": opencode_engine,
+        "engine_router": engine_router,
         "memory": memory,
         "queue": queue,
         "capsules": capsules,
