@@ -1208,6 +1208,86 @@ def create_web_app(
             encoding="utf-8",
         )
 
+    # ── Engine Management ─────────────────────────────────────────
+
+    # Available OpenCode models for UI selection
+    OPENCODE_MODELS = [
+        {"id": "openrouter/deepseek/deepseek-chat-v3.1", "label": "DeepSeek V3.1", "price": "$0.27/1M", "tier": "budget"},
+        {"id": "openrouter/deepseek/deepseek-v3.2", "label": "DeepSeek V3.2", "price": "$0.27/1M", "tier": "budget"},
+        {"id": "openrouter/google/gemini-2.5-flash", "label": "Gemini 2.5 Flash", "price": "$0.15/1M", "tier": "budget"},
+        {"id": "openrouter/google/gemini-2.5-pro", "label": "Gemini 2.5 Pro", "price": "$1.25/1M", "tier": "standard"},
+        {"id": "openrouter/anthropic/claude-sonnet-4", "label": "Claude Sonnet 4", "price": "$3/1M", "tier": "premium"},
+        {"id": "openrouter/anthropic/claude-opus-4", "label": "Claude Opus 4", "price": "$15/1M", "tier": "premium"},
+        {"id": "openrouter/meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (free)", "price": "free", "tier": "free"},
+        {"id": "openrouter/qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)", "price": "free", "tier": "free"},
+    ]
+
+    # Available YandexGPT models for UI selection
+    YANDEX_MODELS = [
+        {"id": "yandexgpt-lite", "label": "YandexGPT Lite", "price": "$1.67/1M", "tier": "budget"},
+        {"id": "yandexgpt-pro", "label": "YandexGPT Pro 5", "price": "$10/1M", "tier": "standard"},
+        {"id": "yandexgpt-pro-5.1", "label": "YandexGPT Pro 5.1", "price": "$6.70/1M", "tier": "standard"},
+    ]
+
+    @app.get("/api/engine")
+    async def get_engine_config(current_user: CurrentUser, request: Request):
+        """Get current engine configuration for user's capsule."""
+        capsule_id = current_user.get("capsule_id")
+        capsules = request.app.state.capsules
+        if not capsule_id or capsule_id not in capsules:
+            return {"engine": "claude", "models": OPENCODE_MODELS}
+
+        cap = capsules[capsule_id]
+        eng = cap.config.engine
+        return {
+            "engine": eng.get("primary", "claude"),
+            "fallback": eng.get("fallback", "opencode"),
+            "opencode_model": eng.get("opencode_model", "openrouter/deepseek/deepseek-chat-v3.1"),
+            "yandex_model": eng.get("yandex_model", "yandexgpt-lite"),
+            "auto_switch": eng.get("auto_switch", True),
+            "models": OPENCODE_MODELS,
+            "yandex_models": YANDEX_MODELS,
+            "claude_models": [
+                {"id": "sonnet", "label": "Claude Sonnet 4.6"},
+                {"id": "opus", "label": "Claude Opus 4.6"},
+                {"id": "haiku", "label": "Claude Haiku 4.5"},
+            ],
+        }
+
+    @app.post("/api/engine")
+    async def set_engine_config(current_user: CurrentUser, request: Request):
+        """Update engine configuration for user's capsule."""
+        capsule_id = current_user.get("capsule_id")
+        capsules = request.app.state.capsules
+        if not capsule_id or capsule_id not in capsules:
+            return JSONResponse({"error": "Capsule not found"}, 404)
+
+        body = await request.json()
+        cap = capsules[capsule_id]
+
+        if "engine" in body:
+            cap.config.engine["primary"] = body["engine"]
+            # Set fallback chain
+            primary = body["engine"]
+            if primary == "claude":
+                cap.config.engine["fallback"] = "opencode"
+            elif primary == "yandex":
+                cap.config.engine["fallback"] = "claude"
+            else:
+                cap.config.engine["fallback"] = "claude"
+
+        if "opencode_model" in body:
+            cap.config.engine["opencode_model"] = body["opencode_model"]
+
+        if "yandex_model" in body:
+            cap.config.engine["yandex_model"] = body["yandex_model"]
+
+        if "auto_switch" in body:
+            cap.config.engine["auto_switch"] = body["auto_switch"]
+
+        logger.info(f"Engine config updated for {capsule_id}: {cap.config.engine}")
+        return {"ok": True, "engine": cap.config.engine}
+
     @app.get("/api/heartbeat")
     async def list_heartbeats(current_user: CurrentUser):
         """List all heartbeat tasks for the current user's capsule."""

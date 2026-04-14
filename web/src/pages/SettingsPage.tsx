@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
-import { LogOut, Keyboard, Info, Sparkles, User, Sun, Moon, Monitor } from 'lucide-react'
+import { LogOut, Keyboard, Info, Sparkles, User, Sun, Moon, Monitor, Cpu, Zap } from 'lucide-react'
 import { useTheme, type ThemePreference } from '@/hooks/useTheme'
+import { api } from '@/api/client'
 
 const MODELS = [
   {
@@ -24,6 +25,27 @@ const MODELS = [
   },
 ]
 
+const ENGINES = [
+  {
+    id: 'claude',
+    label: 'Claude Code',
+    desc: 'Anthropic CLI — максимальное качество, подписка Max',
+    icon: '🧠',
+  },
+  {
+    id: 'opencode',
+    label: 'OpenCode',
+    desc: 'Open-source агент — любые модели через API',
+    icon: '⚡',
+  },
+  {
+    id: 'yandex',
+    label: 'YandexGPT',
+    desc: 'Яндекс — русскоязычная модель, быстрая и дешёвая',
+    icon: '🔍',
+  },
+]
+
 const SHORTCUTS = [
   { keys: 'Ctrl + K', action: 'Поиск' },
   { keys: 'Ctrl + B', action: 'Переключить боковую панель' },
@@ -40,12 +62,64 @@ const THEMES: { id: ThemePreference; label: string; desc: string; icon: React.Re
   { id: 'system', label: 'Системная', desc: 'Следует настройкам устройства', icon: <Monitor size={16} /> },
 ]
 
+interface OpenCodeModel {
+  id: string
+  label: string
+  price: string
+  tier: string
+}
+
 export function SettingsPage() {
   const { user, logout } = useAuth()
   const { preference, setPreference } = useTheme()
   const [selectedModel, setSelectedModel] = useState(
     () => localStorage.getItem('neura_model') ?? 'sonnet-4-6'
   )
+  const [selectedEngine, setSelectedEngine] = useState('claude')
+  const [selectedOpenCodeModel, setSelectedOpenCodeModel] = useState('')
+  const [openCodeModels, setOpenCodeModels] = useState<OpenCodeModel[]>([])
+  const [selectedYandexModel, setSelectedYandexModel] = useState('')
+  const [yandexModels, setYandexModels] = useState<OpenCodeModel[]>([])
+  const [engineLoading, setEngineLoading] = useState(false)
+
+  useEffect(() => {
+    api.get<{engine: string; opencode_model: string; models: OpenCodeModel[]; yandex_model: string; yandex_models: OpenCodeModel[]}>('/api/engine')
+      .then(data => {
+        setSelectedEngine(data.engine || 'claude')
+        setSelectedOpenCodeModel(data.opencode_model || '')
+        setOpenCodeModels(data.models || [])
+        setSelectedYandexModel(data.yandex_model || 'yandexgpt-lite')
+        setYandexModels(data.yandex_models || [])
+      })
+      .catch(() => {})
+  }, [])
+
+  const updateEngine = async (engine: string) => {
+    setSelectedEngine(engine)
+    setEngineLoading(true)
+    try {
+      await api.post('/api/engine', { engine })
+    } catch {}
+    setEngineLoading(false)
+  }
+
+  const updateOpenCodeModel = async (modelId: string) => {
+    setSelectedOpenCodeModel(modelId)
+    setEngineLoading(true)
+    try {
+      await api.post('/api/engine', { opencode_model: modelId })
+    } catch {}
+    setEngineLoading(false)
+  }
+
+  const updateYandexModel = async (modelId: string) => {
+    setSelectedYandexModel(modelId)
+    setEngineLoading(true)
+    try {
+      await api.post('/api/engine', { yandex_model: modelId })
+    } catch {}
+    setEngineLoading(false)
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -129,6 +203,116 @@ export function SettingsPage() {
             ))}
           </div>
         </Section>
+
+        <Section title="Движок агента" icon={<Cpu size={14} />}>
+          <div className="flex flex-col gap-2">
+            {ENGINES.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => updateEngine(e.id)}
+                disabled={engineLoading}
+                className={[
+                  'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                  selectedEngine === e.id
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                    : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                ].join(' ')}
+              >
+                <span className="text-lg shrink-0">{e.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text-primary)]">{e.label}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{e.desc}</p>
+                </div>
+                {selectedEngine === e.id && (
+                  <span className="ml-auto text-[var(--accent)] text-xs font-medium shrink-0">Активен</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {selectedEngine === 'opencode' && openCodeModels.length > 0 && (
+          <Section title="Модель OpenCode" icon={<Zap size={14} />}>
+            <div className="flex flex-col gap-2">
+              {openCodeModels.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => updateOpenCodeModel(m.id)}
+                  disabled={engineLoading}
+                  className={[
+                    'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                    selectedOpenCodeModel === m.id
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                      : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors',
+                      selectedOpenCodeModel === m.id
+                        ? 'border-[var(--accent)] bg-[var(--accent)]'
+                        : 'border-[var(--text-muted)]',
+                    ].join(' ')}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[var(--text-primary)]">{m.label}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{m.price}</p>
+                  </div>
+                  <span className={[
+                    'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
+                    m.tier === 'free' ? 'bg-green-500/10 text-green-500' :
+                    m.tier === 'budget' ? 'bg-blue-500/10 text-blue-500' :
+                    m.tier === 'standard' ? 'bg-yellow-500/10 text-yellow-500' :
+                    'bg-purple-500/10 text-purple-500',
+                  ].join(' ')}>
+                    {m.tier}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {selectedEngine === 'yandex' && yandexModels.length > 0 && (
+          <Section title="Модель YandexGPT" icon={<Zap size={14} />}>
+            <div className="flex flex-col gap-2">
+              {yandexModels.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => updateYandexModel(m.id)}
+                  disabled={engineLoading}
+                  className={[
+                    'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                    selectedYandexModel === m.id
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                      : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors',
+                      selectedYandexModel === m.id
+                        ? 'border-[var(--accent)] bg-[var(--accent)]'
+                        : 'border-[var(--text-muted)]',
+                    ].join(' ')}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[var(--text-primary)]">{m.label}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{m.price}</p>
+                  </div>
+                  <span className={[
+                    'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
+                    m.tier === 'budget' ? 'bg-blue-500/10 text-blue-500' :
+                    m.tier === 'standard' ? 'bg-yellow-500/10 text-yellow-500' :
+                    'bg-purple-500/10 text-purple-500',
+                  ].join(' ')}>
+                    {m.tier}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section title="Горячие клавиши" icon={<Keyboard size={14} />}>
           <div className="flex flex-col gap-0">
