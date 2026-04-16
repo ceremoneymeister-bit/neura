@@ -249,7 +249,7 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
     transport.set_onboarding(cache.redis)
 
     # 8. Web API (FastAPI + uvicorn)
-    web_app = create_web_app(db.pool, engine, memory, queue, capsules)
+    web_app = create_web_app(db.pool, engine, memory, queue, capsules, engine_router=engine_router)
 
     return {
         "db": db,
@@ -287,8 +287,9 @@ async def shutdown(app: dict) -> None:
     if monitoring:
         await monitoring["health"].stop()
         try:
+            server_name = os.environ.get("SERVER_NAME", "Aeza")
             await monitoring["alert_sender"].send(
-                "Graceful shutdown",
+                f"{server_name} | Graceful shutdown",
                 alert_type=SERVICE_STOP,
                 deduplicate=False,
             )
@@ -362,9 +363,26 @@ async def main() -> None:
     heartbeat = app["heartbeat"]
     await heartbeat.start()
 
-    capsule_count = len(app["capsules"])
+    capsules_map = app["capsules"]
+    capsule_count = len(capsules_map)
+    server_name = os.environ.get("SERVER_NAME", "Aeza")
+
+    # Build human-readable list of capsule owners
+    def _capsule_label(cap) -> str:
+        """Extract user name from employees or fall back to capsule id."""
+        for emp in cap.config.employees:
+            if emp.get("role") == "user":
+                return emp.get("name", cap.config.id)
+        # Fallback: format capsule id (e.g. maxim_alexandra_galiskerova → Alexandra Galiskerova)
+        parts = cap.config.id.split("_")
+        # Skip leading "maxim" prefix for Pattern B capsules
+        if parts and parts[0].lower() == "maxim":
+            parts = parts[1:]
+        return " ".join(p.capitalize() for p in parts)
+
+    names = ", ".join(_capsule_label(c) for c in capsules_map.values())
     await alert_sender.send(
-        f"Запущено {capsule_count} капсул(а)",
+        f"{server_name} | Запущено {capsule_count} капсул(а): {names}",
         alert_type=SERVICE_START,
         deduplicate=True,  # Prevent spam during crash loops / rapid restarts
     )

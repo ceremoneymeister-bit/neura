@@ -34,10 +34,11 @@ RESULT_LABELS = {
     "resources":  "Ресурсы исчерпаны",
 }
 label = RESULT_LABELS.get(SERVICE_RESULT, SERVICE_RESULT)
+server_name = os.environ.get("SERVER_NAME", "Aeza")
 
 text = (
     f"<b>[NEURA-V2]</b> 💥 SERVICE_CRASH\n"
-    f"Причина: {label}\n"
+    f"{server_name} | Причина: {label}\n"
     f"systemd перезапустит через 10 сек...\n"
     f"<i>Лог: journalctl -u neura-v2 -n 30</i>"
 )
