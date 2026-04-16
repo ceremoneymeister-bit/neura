@@ -384,7 +384,7 @@ async def main() -> None:
     await alert_sender.send(
         f"{server_name} | Запущено {capsule_count} капсул(а): {names}",
         alert_type=SERVICE_START,
-        deduplicate=True,  # Prevent spam during crash loops / rapid restarts
+        deduplicate=False,  # Always confirm when service is up — don't suppress recovery
     )
 
     # Start Web API (uvicorn)
