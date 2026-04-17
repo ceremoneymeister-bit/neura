@@ -294,11 +294,11 @@ function ActionBar({
             onKeyDown={(e) => e.key === 'Enter' && submitNegative()}
             placeholder="Что не так с ответом?"
             autoFocus
-            className="flex-1 text-sm px-3 py-1.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
+            className="flex-1 text-sm px-3 py-1.5 rounded-lg liquid-glass-input text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
           />
           <button
             onClick={submitNegative}
-            className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/30 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] backdrop-blur-sm border border-[var(--accent)]/20 hover:bg-[var(--accent)]/25 transition-all"
           >
             Отправить
           </button>

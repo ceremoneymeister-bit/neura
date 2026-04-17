@@ -74,7 +74,7 @@ export function ConversationList({
   // Close context menu on Escape or any scroll
   useEffect(() => {
     if (!ctxMenu) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeCtx() }
+    const onKey = (e: Event) => { if ((e as globalThis.KeyboardEvent).key === 'Escape') closeCtx() }
     const onScroll = () => closeCtx()
     document.addEventListener('keydown', onKey)
     document.addEventListener('scroll', onScroll, true)
@@ -167,7 +167,7 @@ export function ConversationList({
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={handleRenameKey}
               onBlur={handleRenameCommit}
-              className="flex-1 h-5 px-1.5 rounded bg-[var(--bg-input)] border border-[var(--accent)]/50 text-xs text-[var(--text-primary)] focus:outline-none"
+              className="flex-1 h-5 px-1.5 rounded liquid-glass-input border-[var(--accent)]/50 text-xs text-[var(--text-primary)] focus:outline-none"
             />
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -245,8 +245,10 @@ export function ConversationList({
         <>
           <div className="fixed inset-0 z-[80]" onClick={closeCtx} onContextMenu={(e) => { e.preventDefault(); closeCtx() }} tabIndex={-1} />
           <div
-            className="fixed z-[90] min-w-[180px] rounded-xl py-1.5 text-xs bg-[var(--bg-card)] border border-[var(--border)] shadow-2xl"
+            className="fixed z-[90] min-w-[180px] rounded-xl py-1.5 text-xs liquid-glass-popup"
             style={{
+              position: 'fixed',
+              overflow: 'visible',
               left: Math.max(8, Math.min(ctxMenu.x, window.innerWidth - 190)),
               top: Math.max(8, Math.min(ctxMenu.y, window.innerHeight - 280)),
             }}

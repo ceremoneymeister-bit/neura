@@ -205,9 +205,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     <div className="flex flex-col h-full bg-[var(--bg-sidebar)] select-none">
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="px-3 py-3.5 flex items-center justify-between">
-        <span className="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">
-          {brandName}
-        </span>
+        <BrandLogo name={brandName} />
         <button
           onClick={onClose}
           aria-label="Скрыть панель"
@@ -369,6 +367,7 @@ function FooterBar({ onClose }: { onClose?: () => void }) {
     const rect = btnRef.current.getBoundingClientRect()
     setMenuStyle({
       position: 'fixed',
+      overflow: 'visible',
       bottom: window.innerHeight - rect.top + 4,
       left: rect.left,
       width: rect.width,
@@ -446,6 +445,25 @@ function FooterBar({ onClose }: { onClose?: () => void }) {
         <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
       </button>
     </div>
+  )
+}
+
+function BrandLogo({ name }: { name: string }) {
+  // Support "Platform | Brand" format — render brand name smaller
+  const parts = name.split(' | ')
+  if (parts.length === 2) {
+    return (
+      <span className="flex items-baseline gap-0 text-[var(--text-primary)] tracking-tight">
+        <span className="text-[17px] font-semibold">{parts[0]}</span>
+        <span className="text-[11px] text-[var(--text-muted)] mx-1.5">·</span>
+        <span className="text-[13px] font-medium text-[var(--text-secondary)]">{parts[1]}</span>
+      </span>
+    )
+  }
+  return (
+    <span className="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">
+      {name}
+    </span>
   )
 }
 

@@ -43,16 +43,20 @@ function WelcomeScreen() {
   const [sending, setSending] = useState(false)
   const firstName = user?.name?.split(' ')[0]
 
-  const handleSend = useCallback(async (text: string, files: string[]) => {
+  const handleSend = useCallback(async (text: string, files: string[], model?: string, engine?: string) => {
     if (sending) return
     setSending(true)
     try {
       const conv = await createConversation()
-      // Store pending message for ChatView to pick up after mount
+      // Store pending message WITH engine and model for ChatView to pick up
       sessionStorage.setItem(
         `pending_msg_${conv.id}`,
-        JSON.stringify({ text, files }),
+        JSON.stringify({ text, files, model, engine: engine ?? 'claude' }),
       )
+      // Save engine per-conversation
+      if (engine) {
+        sessionStorage.setItem(`engine_${conv.id}`, engine)
+      }
       navigate(`/chat/${conv.id}`)
     } catch (e) {
       console.error('Failed to create conversation:', e)

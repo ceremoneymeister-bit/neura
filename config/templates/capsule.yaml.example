@@ -1,0 +1,42 @@
+# Capsule Configuration Template
+# Copy and rename: cp capsule.yaml.example ../capsules/my_capsule.yaml
+# Then create home: mkdir -p ../../homes/my_capsule
+
+id: my_capsule                    # Unique ID (lowercase, underscores)
+name: AI Assistant                # Display name shown to user
+owner:
+  name: Client Name               # Owner's full name
+  telegram_id: 123456789          # Telegram user ID (get from @userinfobot)
+
+telegram:
+  bot_token: ${MY_CAPSULE_BOT_TOKEN}  # Reference to .env variable
+  features:
+    streaming: true               # Stream responses word-by-word
+    voice_input: true             # Accept voice messages (requires Deepgram)
+    file_tools: true              # Accept files (images, docs, audio)
+    proactive: false              # Proactive messages (optional)
+    btw_queue: true               # Queue messages during processing
+
+claude:
+  model: sonnet                   # sonnet | opus | haiku
+  effort: high                    # high | medium | low
+  system_prompt: my_capsule/SYSTEM.md  # Path relative to homes/
+
+# Skills — list of skill IDs from skills/ directory
+skills: []
+
+# Memory settings
+memory:
+  diary_limit: 10                 # Recent diary entries in context
+  diary_days: 3                   # Days of diary history
+  vector_results: 5               # Vector search results count
+
+# Rate limiting
+rate_limit:
+  daily_max: 100                  # Max requests per day (0 = unlimited)
+
+# Optional: subscription/trial
+# subscription:
+#   type: trial                   # trial | paid | unlimited
+#   trial_days: 5
+#   admin_telegram_id: 123456789  # Who to notify on trial end

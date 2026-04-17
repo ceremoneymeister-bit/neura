@@ -22,8 +22,7 @@ FALLBACK_ERRORS = {"AUTH", "RATE_LIMIT", "NO_BALANCE", "SIGTERM", "OOM"}
 
 # Approximate token costs per 1M tokens (USD) for common models
 MODEL_COSTS = {
-    "openrouter/deepseek/deepseek-chat-v3.1": (0.27, 1.10),
-    "openrouter/deepseek/deepseek-v3.2": (0.27, 1.10),
+    "openrouter/openai/gpt-oss-120b:free": (0.0, 0.0),
     "openrouter/google/gemini-2.5-flash": (0.15, 0.60),
     "openrouter/google/gemini-2.5-pro": (1.25, 10.0),
     "openrouter/anthropic/claude-sonnet-4": (3.0, 15.0),
@@ -68,7 +67,7 @@ class RouterConfig:
     """Per-capsule engine routing config."""
     primary: str = "claude"          # "claude", "opencode", or "yandex"
     fallback: str | None = "opencode"  # fallback engine
-    opencode_model: str = "openrouter/deepseek/deepseek-chat-v3.1"  # default cheap model
+    opencode_model: str = "openrouter/openai/gpt-oss-120b:free"  # default cheap model
     opencode_model_premium: str = "openrouter/anthropic/claude-sonnet-4"  # premium fallback
     yandex_model: str = "yandexgpt-lite"  # yandexgpt-lite, yandexgpt-pro, yandexgpt-pro-5.1
     auto_switch: bool = True         # auto-fallback on error

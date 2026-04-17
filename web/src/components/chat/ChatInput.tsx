@@ -7,17 +7,59 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react'
-import { Plus, Mic, MicOff, X, ChevronDown, ArrowUp } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Plus, Mic, MicOff, X, ChevronDown, ArrowUp, Brain, Zap, Search } from 'lucide-react'
 import { uploadFile } from '@/api/client'
+import { api } from '@/api/client'
 import { fileIcon } from '@/utils/time'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 
-const MODEL_OPTIONS = [
+interface ModelOption {
+  id: string
+  label: string
+  desc: string
+  price?: string
+  tier?: string
+}
+
+const CLAUDE_MODELS: ModelOption[] = [
   { id: 'sonnet-4-6', label: 'Sonnet 4.6', desc: 'Быстрый и умный' },
   { id: 'opus-4-6', label: 'Opus 4.6', desc: 'Максимальный интеллект' },
   { id: 'haiku-4-5', label: 'Haiku 4.5', desc: 'Сверхбыстрый' },
 ]
+
+const OPENCODE_MODELS: ModelOption[] = [
+  { id: 'openrouter/deepseek/deepseek-chat-v3.1', label: 'DeepSeek V3.1', desc: '$0.27/1M', tier: 'budget' },
+  { id: 'openrouter/deepseek/deepseek-v3.2', label: 'DeepSeek V3.2', desc: '$0.27/1M', tier: 'budget' },
+  { id: 'openrouter/google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: '$0.15/1M', tier: 'budget' },
+  { id: 'openrouter/google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: '$1.25/1M', tier: 'standard' },
+  { id: 'openrouter/anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 API', desc: '$3/1M', tier: 'premium' },
+]
+
+const YANDEX_MODELS: ModelOption[] = [
+  { id: 'yandexgpt-lite', label: 'YandexGPT Lite', desc: 'Быстрый и дешёвый', tier: 'budget' },
+  { id: 'yandexgpt', label: 'YandexGPT', desc: 'Стандартный', tier: 'standard' },
+  { id: 'yandexgpt-pro', label: 'YandexGPT Pro', desc: 'Максимальное качество', tier: 'premium' },
+]
+
+const ENGINES = [
+  { id: 'claude', label: 'Claude Code', Icon: Brain, disabled: false },
+  { id: 'opencode', label: 'OpenCode', Icon: Zap, disabled: false },
+  { id: 'yandex', label: 'YandexGPT', Icon: Search, disabled: true },
+]
+
+function getModelsForEngine(engine: string): ModelOption[] {
+  switch (engine) {
+    case 'opencode': return OPENCODE_MODELS
+    case 'yandex': return YANDEX_MODELS
+    default: return CLAUDE_MODELS
+  }
+}
+
+function getEngineIconComponent(engine: string) {
+  return ENGINES.find(e => e.id === engine)?.Icon ?? Brain
+}
 
 interface AttachedFile {
   name: string
@@ -25,11 +67,12 @@ interface AttachedFile {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, files: string[], model: string) => void
+  onSend: (text: string, files: string[], model: string, engine?: string) => void
   disabled?: boolean
   conversationId?: string
   placeholder?: string
   initialModel?: string
+  initialEngine?: string
 }
 
 export function ChatInput({
@@ -38,6 +81,7 @@ export function ChatInput({
   conversationId,
   placeholder = 'Чем могу помочь сегодня?',
   initialModel,
+  initialEngine,
 }: ChatInputProps) {
   const { error: showError } = useToast()
   const [text, setText] = useState('')
@@ -45,18 +89,72 @@ export function ChatInput({
   const [isUploading, setIsUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+
+  // Engine state — per conversation (new chat always starts with claude)
+  const [currentEngine, setCurrentEngine] = useState(() => {
+    if (initialEngine) return initialEngine
+    if (conversationId) {
+      return sessionStorage.getItem(`engine_${conversationId}`) ?? 'claude'
+    }
+    return 'claude'
+  })
+  const [engineMenuOpen, setEngineMenuOpen] = useState(false)
+
+  // Model state — depends on engine
+  const models = getModelsForEngine(currentEngine)
   const [selectedModel, setSelectedModel] = useState(() => {
     const modelId = initialModel ?? localStorage.getItem('neura_model')
-    return MODEL_OPTIONS.find((m) => m.id === modelId) ?? MODEL_OPTIONS[0]
+    return models.find((m) => m.id === modelId) ?? models[0]
   })
   const [modelOpen, setModelOpen] = useState(false)
+
+  // Sync model when engine changes
+  useEffect(() => {
+    const newModels = getModelsForEngine(currentEngine)
+    const savedModelId =
+      localStorage.getItem(`neura_model_${currentEngine}`) ??
+      localStorage.getItem('neura_model')
+    setSelectedModel(
+      newModels.find(m => m.id === savedModelId) ?? newModels[0]
+    )
+  }, [currentEngine])
+
+  // Sync model when initialModel prop changes (conversation switch)
+  useEffect(() => {
+    const currentModels = getModelsForEngine(currentEngine)
+    if (initialModel) {
+      const found = currentModels.find((m) => m.id === initialModel)
+      if (found) setSelectedModel(found)
+    } else {
+      const savedId = localStorage.getItem('neura_model')
+      const found = currentModels.find((m) => m.id === savedId)
+      if (found) setSelectedModel(found)
+    }
+  }, [initialModel])
+
+  // Reset engine when conversation changes
+  useEffect(() => {
+    if (conversationId) {
+      const saved = sessionStorage.getItem(`engine_${conversationId}`)
+      setCurrentEngine(saved ?? 'claude')
+    } else {
+      setCurrentEngine('claude') // new chat = always claude
+    }
+  }, [conversationId])
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
-  const modelRef = useRef<HTMLDivElement>(null)
+  const modelBtnRef = useRef<HTMLButtonElement>(null)
+  const modelPopupRef = useRef<HTMLDivElement>(null)
+  const engineBtnRef = useRef<HTMLButtonElement>(null)
+  const enginePopupRef = useRef<HTMLDivElement>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
+
+  // Popup positioning
+  const [modelPopupPos, setModelPopupPos] = useState({ bottom: 0, right: 0 })
+  const [enginePopupPos, setEnginePopupPos] = useState({ bottom: 0, left: 0 })
 
   // Restore draft
   useEffect(() => {
@@ -73,7 +171,7 @@ export function ChatInput({
     }
   }, [text, conversationId])
 
-  // Auto-resize textarea — grows up to 50vh, no internal scrollbar
+  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -87,19 +185,27 @@ export function ChatInput({
     if (!disabled) textareaRef.current?.focus()
   }, [conversationId, disabled])
 
-  // Close model dropdown on outside click
+  // Close dropdowns on outside click — check both button AND popup refs
   useEffect(() => {
-    if (!modelOpen) return
+    if (!modelOpen && !engineMenuOpen) return
     const handler = (e: MouseEvent) => {
-      if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
-        setModelOpen(false)
+      const target = e.target as Node
+      if (modelOpen) {
+        const inBtn = modelBtnRef.current?.contains(target)
+        const inPopup = modelPopupRef.current?.contains(target)
+        if (!inBtn && !inPopup) setModelOpen(false)
+      }
+      if (engineMenuOpen) {
+        const inBtn = engineBtnRef.current?.contains(target)
+        const inPopup = enginePopupRef.current?.contains(target)
+        if (!inBtn && !inPopup) setEngineMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [modelOpen])
+  }, [modelOpen, engineMenuOpen])
 
-  // Prefill from welcome cards (legacy event)
+  // Prefill from welcome cards
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail
@@ -109,16 +215,37 @@ export function ChatInput({
     return () => document.removeEventListener('neura:prefill-input', handler)
   }, [])
 
+  const switchEngine = useCallback((engineId: string) => {
+    setCurrentEngine(engineId)
+    if (conversationId) {
+      sessionStorage.setItem(`engine_${conversationId}`, engineId)
+    }
+    setEngineMenuOpen(false)
+    // Save to API for backend routing
+    api.post('/api/engine', { engine: engineId }).catch(() => {})
+  }, [conversationId])
+
+  const selectModel = useCallback((model: ModelOption) => {
+    setSelectedModel(model)
+    if (conversationId) {
+      sessionStorage.setItem(`model_${conversationId}`, model.id)
+    }
+    setModelOpen(false)
+    // Save to API for backend routing
+    if (currentEngine === 'opencode') {
+      api.post('/api/engine', { opencode_model: model.id }).catch(() => {})
+    }
+  }, [currentEngine, conversationId])
+
   const doSend = useCallback(() => {
     const trimmed = text.trim()
     if ((!trimmed && attachedFiles.length === 0) || disabled || isUploading) return
-
-    onSend(trimmed, attachedFiles.map((f) => f.path), selectedModel.id)
+    onSend(trimmed, attachedFiles.map((f) => f.path), selectedModel.id, currentEngine)
     setText('')
     setAttachedFiles([])
     if (conversationId) sessionStorage.removeItem(`draft_${conversationId}`)
     textareaRef.current?.focus()
-  }, [text, attachedFiles, disabled, isUploading, onSend, conversationId])
+  }, [text, attachedFiles, disabled, isUploading, onSend, conversationId, selectedModel])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -135,20 +262,16 @@ export function ChatInput({
     }
   }, [])
 
-  const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+  const MAX_FILE_SIZE = 100 * 1024 * 1024
 
   const uploadFiles = useCallback(async (selected: File[]) => {
     if (selected.length === 0) return
-
-    // Client-side size check
     const oversized = selected.filter((f) => f.size > MAX_FILE_SIZE)
     if (oversized.length > 0) {
-      const names = oversized.map((f) => f.name).join(', ')
-      showError(`Файлы превышают 100MB: ${names}`)
+      showError(`Файлы превышают 100MB: ${oversized.map(f => f.name).join(', ')}`)
       selected = selected.filter((f) => f.size <= MAX_FILE_SIZE)
       if (selected.length === 0) return
     }
-
     const controller = new AbortController()
     uploadAbortRef.current = controller
     setIsUploading(true)
@@ -167,12 +290,8 @@ export function ChatInput({
           }
         }
       })
-      if (succeeded.length > 0) {
-        setAttachedFiles((prev) => [...prev, ...succeeded])
-      }
-      if (failedNames.length > 0) {
-        showError(`Не удалось загрузить: ${failedNames.join(', ')}`)
-      }
+      if (succeeded.length > 0) setAttachedFiles((prev) => [...prev, ...succeeded])
+      if (failedNames.length > 0) showError(`Не удалось загрузить: ${failedNames.join(', ')}`)
     } finally {
       uploadAbortRef.current = null
       setIsUploading(false)
@@ -184,71 +303,63 @@ export function ChatInput({
     e.target.value = ''
     await uploadFiles(selected)
   }
+  const removeFile = (idx: number) => setAttachedFiles((prev) => prev.filter((_f, i) => i !== idx))
 
-  const removeFile = (idx: number) => {
-    setAttachedFiles((prev) => prev.filter((_f, i) => i !== idx))
-  }
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setIsDragging(true) }
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setIsDragging(false) }
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setIsDragging(false); await uploadFiles(Array.from(e.dataTransfer.files)) }
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragging(false)
-    await uploadFiles(Array.from(e.dataTransfer.files))
-  }
-
-  // Clipboard paste (images/files from buffer)
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items
     if (!items) return
     const files: File[] = []
     for (const item of Array.from(items)) {
-      if (item.kind === 'file') {
-        const f = item.getAsFile()
-        if (f) files.push(f)
-      }
+      if (item.kind === 'file') { const f = item.getAsFile(); if (f) files.push(f) }
     }
-    if (files.length > 0) {
-      e.preventDefault()
-      await uploadFiles(files)
-    }
+    if (files.length > 0) { e.preventDefault(); await uploadFiles(files) }
   }, [uploadFiles])
 
-  // Voice recording
   const toggleRecording = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop()
-      setIsRecording(false)
-      return
-    }
+    if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
       mediaRecorderRef.current = recorder
       audioChunksRef.current = []
-
-      recorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data)
-      }
+      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data)
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
-        await uploadFiles([file])
+        await uploadFiles([new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })])
       }
-
       recorder.start()
       setIsRecording(true)
     } catch {
-      console.error('Microphone access denied')
       showError('Нет доступа к микрофону')
     }
+  }
+
+  // Calculate popup position for model selector
+  const openModelMenu = () => {
+    if (modelBtnRef.current) {
+      const rect = modelBtnRef.current.getBoundingClientRect()
+      setModelPopupPos({
+        bottom: window.innerHeight - rect.top + 6,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    setModelOpen(v => !v)
+  }
+
+  const openEngineMenu = () => {
+    if (engineBtnRef.current) {
+      const rect = engineBtnRef.current.getBoundingClientRect()
+      setEnginePopupPos({
+        bottom: window.innerHeight - rect.top + 6,
+        left: rect.left,
+      })
+    }
+    setEngineMenuOpen(v => !v)
   }
 
   return (
@@ -258,7 +369,6 @@ export function ChatInput({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Drag overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none rounded-2xl mx-4">
           <div className="border-2 border-dashed border-[var(--accent)] rounded-2xl px-8 py-4 bg-[var(--accent)]/10 text-[var(--accent)] text-sm font-medium">
@@ -267,50 +377,26 @@ export function ChatInput({
         </div>
       )}
 
-      {/* File chips */}
       {attachedFiles.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2 max-h-[120px] overflow-y-auto">
           {attachedFiles.map((f, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-secondary)]"
-            >
+            <div key={i} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md liquid-glass text-[var(--text-secondary)]">
               <span>{fileIcon(f.name)}</span>
               <span className="max-w-[140px] truncate">{f.name}</span>
-              <button
-                onClick={() => removeFile(i)}
-                aria-label="Удалить файл"
-                title="Удалить файл"
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors ml-0.5 flex-shrink-0"
-              >
-                <X size={11} />
-              </button>
+              <button onClick={() => removeFile(i)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors ml-0.5 flex-shrink-0"><X size={11} /></button>
             </div>
           ))}
           {isUploading && (
-            <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[var(--bg-input)] border border-[var(--accent)]/30 text-[var(--text-muted)]">
+            <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-md liquid-glass border-[var(--accent)]/30 text-[var(--text-muted)]">
               <span className="inline-block w-3 h-3 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
               <span>Загрузка...</span>
-              <button
-                onClick={cancelUpload}
-                aria-label="Отменить загрузку"
-                title="Отменить загрузку"
-                className="ml-1 text-[var(--text-muted)] hover:text-red-400 transition-colors flex-shrink-0"
-              >
-                <X size={11} />
-              </button>
+              <button onClick={cancelUpload} className="ml-1 text-[var(--text-muted)] hover:text-red-400 transition-colors flex-shrink-0"><X size={11} /></button>
             </div>
           )}
         </div>
       )}
 
-      {/* Input box — Claude.ai style */}
-      <div
-        className={`flex flex-col liquid-glass-input rounded-[20px] outline-none ${
-          isDragging ? '!border-[var(--accent)]' : ''
-        }`}
-      >
-        {/* Textarea area */}
+      <div className={`flex flex-col liquid-glass-input rounded-[20px] outline-none ${isDragging ? '!border-[var(--accent)]' : ''}`}>
         <textarea
           ref={textareaRef}
           data-chat-input
@@ -324,113 +410,65 @@ export function ChatInput({
           className="w-full bg-transparent text-[15px] text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none leading-6 px-4 pt-3.5 pb-1.5 min-h-[44px] focus:outline-none focus:ring-0 focus:shadow-none"
           style={{ boxShadow: 'none' }}
         />
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
 
-        {/* Bottom controls row */}
         <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
-          {/* Left: attach */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            title="Прикрепить файл"
-            aria-label="Прикрепить файл"
-            className="p-2 md:p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-30 rounded-md hover:bg-[var(--bg-hover)] min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
-          >
-            <Plus size={18} strokeWidth={1.5} />
-          </button>
+          {/* Left: attach + engine */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              title="Прикрепить файл"
+              className="p-2 md:p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-30 rounded-md hover:bg-[var(--bg-hover)] min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
+            >
+              <Plus size={18} strokeWidth={1.5} />
+            </button>
 
-          {/* Right: model selector + voice */}
+            {/* Engine switcher */}
+            <button
+              ref={engineBtnRef}
+              type="button"
+              onClick={openEngineMenu}
+              title="Сменить движок"
+              className="flex items-center gap-1 px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
+            >
+              {(() => { const Icon = getEngineIconComponent(currentEngine); return <Icon size={14} /> })()}
+            </button>
+          </div>
+
+          {/* Right: model selector + voice + send */}
           <div className="flex items-center gap-1">
-            {/* Model selector */}
-            <div className="relative" ref={modelRef}>
-              <button
-                onClick={() => setModelOpen((v) => !v)}
-                aria-label="Выбрать модель"
-                title="Выбрать модель"
-                className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
-              >
-                <span>{selectedModel.label}</span>
-                <ChevronDown
-                  size={11}
-                  className={`transition-transform duration-150 ${modelOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
+            <button
+              ref={modelBtnRef}
+              onClick={openModelMenu}
+              title="Выбрать модель"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
+            >
+              <span>{selectedModel.label}</span>
+              <ChevronDown size={11} className={`transition-transform duration-150 ${modelOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-              <AnimatePresence>
-                {modelOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute right-0 bottom-full mb-1.5 w-52 liquid-glass-popup rounded-xl z-50 overflow-hidden"
-                  >
-                    {MODEL_OPTIONS.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          setSelectedModel(model)
-                          localStorage.setItem('neura_model', model.id)
-                          setModelOpen(false)
-                        }}
-                        className={`flex flex-col w-full px-3 py-2 text-left transition-colors ${
-                          selectedModel.id === model.id
-                            ? 'bg-[var(--accent)]/10'
-                            : 'hover:bg-[var(--bg-hover)]'
-                        }`}
-                      >
-                        <span
-                          className={`text-xs font-medium ${
-                            selectedModel.id === model.id
-                              ? 'text-[var(--text-primary)]'
-                              : 'text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          {model.label}
-                        </span>
-                        <span className="text-[10px] text-[var(--text-muted)]">
-                          {model.desc}
-                        </span>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Voice */}
             <button
               type="button"
               onClick={toggleRecording}
               disabled={disabled}
               title={isRecording ? 'Остановить запись' : 'Голосовое сообщение'}
-              aria-label={isRecording ? 'Остановить запись' : 'Голосовое сообщение'}
               className={`p-2 md:p-1.5 rounded-md transition-colors disabled:opacity-30 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
-                isRecording
-                  ? 'text-red-400 pulse-ring'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                isRecording ? 'text-red-400 pulse-ring' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
 
-            {/* Send */}
             <button
               type="button"
               onClick={doSend}
               disabled={disabled || (!text.trim() && attachedFiles.length === 0)}
               title="Отправить"
-              aria-label="Отправить"
               className={`p-2 md:p-1 rounded-full transition-all duration-150 ease-in-out disabled:opacity-30 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
                 text.trim() || attachedFiles.length > 0
-                  ? 'bg-[var(--accent)] text-white hover:brightness-110'
+                  ? 'bg-[var(--accent)]/80 text-white backdrop-blur-lg border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-[var(--accent)]/90'
                   : 'bg-transparent text-[var(--text-muted)]'
               }`}
             >
@@ -439,6 +477,97 @@ export function ChatInput({
           </div>
         </div>
       </div>
+
+      {/* Model popup — portal to body */}
+      {modelOpen && createPortal(
+        <div
+          ref={modelPopupRef}
+          className="fixed z-[9999]"
+          style={{ bottom: modelPopupPos.bottom, right: modelPopupPos.right }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.12 }}
+            className="w-56 liquid-glass-popup rounded-xl overflow-hidden shadow-xl"
+          >
+            <div className="px-3 py-1.5 text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]/50">
+              {ENGINES.find(e => e.id === currentEngine)?.label ?? 'Модели'}
+            </div>
+            {models.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => selectModel(model)}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${
+                  selectedModel.id === model.id ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs font-medium ${
+                    selectedModel.id === model.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+                  }`}>{model.label}</span>
+                  <span className="block text-[10px] text-[var(--text-muted)]">{model.desc}</span>
+                </div>
+                {model.tier && (
+                  <span className={`text-[9px] px-1 py-0.5 rounded shrink-0 ${
+                    model.tier === 'free' ? 'bg-green-500/10 text-green-500' :
+                    model.tier === 'budget' ? 'bg-blue-500/10 text-blue-500' :
+                    model.tier === 'standard' ? 'bg-yellow-500/10 text-yellow-500' :
+                    'bg-purple-500/10 text-purple-500'
+                  }`}>{model.tier}</span>
+                )}
+              </button>
+            ))}
+          </motion.div>
+        </div>,
+        document.body
+      )}
+
+      {/* Engine popup — portal to body */}
+      {engineMenuOpen && createPortal(
+        <div
+          ref={enginePopupRef}
+          className="fixed z-[9999]"
+          style={{ bottom: enginePopupPos.bottom, left: enginePopupPos.left }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.12 }}
+            className="w-48 liquid-glass-popup rounded-xl overflow-hidden shadow-xl"
+          >
+            <div className="px-3 py-1.5 text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]/50">
+              Движок
+            </div>
+            {ENGINES.map((eng) => (
+              <button
+                key={eng.id}
+                onClick={() => !eng.disabled && switchEngine(eng.id)}
+                disabled={eng.disabled}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${
+                  eng.disabled
+                    ? 'opacity-40 cursor-not-allowed'
+                    : currentEngine === eng.id ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <eng.Icon size={14} className={currentEngine === eng.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'} />
+                <span className={`text-xs font-medium ${
+                  currentEngine === eng.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+                }`}>{eng.label}</span>
+                {eng.disabled && (
+                  <span className="ml-auto text-[var(--text-muted)] text-[9px]">скоро</span>
+                )}
+                {!eng.disabled && currentEngine === eng.id && (
+                  <span className="ml-auto text-[var(--accent)] text-[10px]">active</span>
+                )}
+              </button>
+            ))}
+          </motion.div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

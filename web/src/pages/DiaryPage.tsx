@@ -95,7 +95,7 @@ export function DiaryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Поиск по истории..."
-              className="w-full h-9 pl-9 pr-4 text-sm rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+              className="w-full h-9 pl-9 pr-4 text-sm rounded-lg liquid-glass-input text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
             />
           </div>
           {isSearching && (
@@ -159,7 +159,7 @@ function DiaryCard({ entry }: { entry: DiaryEntry }) {
   const isLong = (entry.bot_response?.length ?? 0) > 200
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 transition-colors hover:border-[var(--accent)]/20">
+    <div className="rounded-xl liquid-glass p-4 transition-colors hover:border-[var(--accent)]/20">
       {/* Meta */}
       <div className="flex items-center gap-3 mb-2 text-[10px] text-[var(--text-muted)]">
         <span className="flex items-center gap-1">
@@ -182,7 +182,7 @@ function DiaryCard({ entry }: { entry: DiaryEntry }) {
           </span>
         )}
         {entry.source && (
-          <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)]">
+          <span className="px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] backdrop-blur-sm border border-[var(--accent)]/15">
             {entry.source}
           </span>
         )}

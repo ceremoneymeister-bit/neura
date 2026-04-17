@@ -126,7 +126,7 @@ export function ProjectsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Поиск проектов..."
-              className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
+              className="w-full h-9 pl-9 pr-4 rounded-lg liquid-glass-input text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
             />
           </div>
         )}
@@ -203,7 +203,7 @@ export function ProjectsPage() {
               onChange={(e) => setCreateDesc(e.target.value)}
               placeholder="О чём этот проект? (необязательно)"
               rows={2}
-              className="w-full rounded-md bg-[var(--bg-input)] border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 resize-none focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
+              className="w-full rounded-md liquid-glass-input text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 resize-none focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
             />
           </div>
 
@@ -253,7 +253,7 @@ function ProjectCard({
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--text-muted)]/20 transition-all"
+      className="group w-full text-left p-4 rounded-xl liquid-glass hover:border-[var(--text-muted)]/20 transition-all"
     >
       <div className="flex items-start justify-between mb-3">
         <ProjectIcon size={28} />

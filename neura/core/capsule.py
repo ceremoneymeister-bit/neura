@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from neura.core.engine import EngineConfig
+from neura.core.engine_router import RouterConfig
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ DEFAULT_TOOLS = ["Read", "Glob", "Grep", "Write", "Edit", "WebSearch", "WebFetch
 DEFAULT_MEMORY = {"diary_retention_days": 90, "max_long_term_entries": 100,
                   "context_window": {"today_diary": 10, "recent_days": 3}}
 DEFAULT_RATE_LIMIT = {"max_per_day": 100, "warn_at": 50}
+
+# Skills auto-injected into ALL capsules (platform-level, no YAML edit needed)
+DEFAULT_GLOBAL_SKILLS = ["heartbeat", "smart-response"]
 DEFAULT_HOMES_DIR = str(Path(__file__).resolve().parent.parent.parent / "homes")
 
 REQUIRED_FIELDS = ["id", "name"]
@@ -54,6 +58,15 @@ def _deep_resolve(obj):
     return obj
 
 
+def _merge_global_skills(capsule_skills: list[str]) -> list[str]:
+    """Merge DEFAULT_GLOBAL_SKILLS into capsule's skill list (deduplicated)."""
+    merged = list(capsule_skills)
+    for skill in DEFAULT_GLOBAL_SKILLS:
+        if skill not in merged:
+            merged.append(skill)
+    return merged
+
+
 @dataclass
 class CapsuleConfig:
     """All configuration for a single capsule."""
@@ -82,6 +95,13 @@ class CapsuleConfig:
     internal_groups: list[int] = field(default_factory=list)
     mention_required_groups: list[int] = field(default_factory=list)
     heartbeat: list[dict] = field(default_factory=list)
+    # Engine routing: primary/fallback engine selection
+    engine: dict = field(default_factory=lambda: {
+        "primary": "claude",
+        "fallback": "opencode",
+        "opencode_model": "openrouter/openai/gpt-oss-120b:free",
+        "auto_switch": True,
+    })
 
 
 class Capsule:
@@ -126,7 +146,7 @@ class Capsule:
             effort=claude.get("effort", "standard"),
             allowed_tools=claude.get("allowed_tools", list(DEFAULT_TOOLS)),
             system_prompt_path=claude.get("system_prompt", ""),
-            skills=data.get("skills", []),
+            skills=_merge_global_skills(data.get("skills", [])),
             employees=data.get("employees", []),
             features=telegram.get("features", {}),
             memory=data.get("memory", dict(DEFAULT_MEMORY)),
@@ -136,6 +156,12 @@ class Capsule:
             internal_groups=[int(g) for g in data.get("internal_groups", [])],
             mention_required_groups=[int(g) for g in data.get("mention_required_groups", [])],
             heartbeat=data.get("heartbeat", []),
+            engine=data.get("engine", {
+                "primary": "claude",
+                "fallback": "opencode",
+                "opencode_model": "openrouter/openai/gpt-oss-120b:free",
+                "auto_switch": True,
+            }),
         )
 
         logger.info(f"Loaded capsule: {cfg.id} ({cfg.name})")
@@ -164,6 +190,17 @@ class Capsule:
             allowed_tools=list(self.config.allowed_tools),
             home_dir=self.config.home_dir,
             append_system_prompt=skills_prompt,
+        )
+
+    def get_router_config(self) -> RouterConfig:
+        """Convert capsule engine config to RouterConfig."""
+        eng = self.config.engine
+        return RouterConfig(
+            primary=eng.get("primary", "claude"),
+            fallback=eng.get("fallback", "opencode"),
+            opencode_model=eng.get("opencode_model", "openrouter/openai/gpt-oss-120b:free"),
+            opencode_model_premium=eng.get("opencode_model_premium", "openrouter/anthropic/claude-sonnet-4"),
+            auto_switch=eng.get("auto_switch", True),
         )
 
     def is_employee(self, telegram_id: int) -> bool:

@@ -39,7 +39,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorState> {
           <p className="text-sm text-[var(--text-muted)] max-w-xs font-mono">{this.state.error.message}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-2 px-4 py-2 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] transition-colors"
+            className="mt-2 px-5 py-2 rounded-full bg-[var(--accent)]/80 text-white text-sm backdrop-blur-lg border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-[var(--accent)]/90 transition-all"
           >
             Перезагрузить
           </button>
@@ -75,21 +75,23 @@ function ProtectedRoute() {
 
 function TitleManager() {
   const location = useLocation()
+  const { brandName } = useBrandTheme()
   useEffect(() => {
     const path = location.pathname
-    let title = 'Neura'
-    if (path.startsWith('/chat/')) title = 'Чат — Neura'
-    else if (path === '/chat') title = 'Новый чат — Neura'
-    else if (path === '/projects') title = 'Проекты — Neura'
-    else if (path.startsWith('/projects/')) title = 'Проект — Neura'
-    else if (path === '/settings') title = 'Настройки — Neura'
-    else if (path === '/heartbeat') title = 'Автоматизации — Neura'
-    else if (path === '/diary') title = 'Дневник — Neura'
-    else if (path === '/memory') title = 'Память — Neura'
-    else if (path === '/login') title = 'Войти — Neura'
-    else if (path === '/register') title = 'Регистрация — Neura'
+    const name = brandName || 'Neura'
+    let title = name
+    if (path.startsWith('/chat/')) title = `Чат — ${name}`
+    else if (path === '/chat') title = `Новый чат — ${name}`
+    else if (path === '/projects') title = `Проекты — ${name}`
+    else if (path.startsWith('/projects/')) title = `Проект — ${name}`
+    else if (path === '/settings') title = `Настройки — ${name}`
+    else if (path === '/heartbeat') title = `Автоматизации — ${name}`
+    else if (path === '/diary') title = `Дневник — ${name}`
+    else if (path === '/memory') title = `Память — ${name}`
+    else if (path === '/login') title = `Войти — ${name}`
+    else if (path === '/register') title = `Регистрация — ${name}`
     document.title = title
-  }, [location])
+  }, [location, brandName])
   return null
 }
 

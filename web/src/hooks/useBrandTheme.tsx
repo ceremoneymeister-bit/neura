@@ -66,7 +66,10 @@ export function useBrandTheme() {
     root.setAttribute('data-brand', brand.id || brand.theme_id)
 
     // Apply accent colors (same for light and dark)
-    if (brand.accent) root.style.setProperty('--accent', brand.accent)
+    if (brand.accent) {
+      root.style.setProperty('--accent', brand.accent)
+      root.style.setProperty('--border-focus', brand.accent)
+    }
     if (brand.accent_hover) root.style.setProperty('--accent-hover', brand.accent_hover)
     if (brand.accent_muted) root.style.setProperty('--accent-muted', brand.accent_muted)
     if (brand.accent_light) root.style.setProperty('--accent-light', brand.accent_light)
@@ -88,7 +91,7 @@ export function useBrandTheme() {
     return () => {
       const allVars = [
         '--accent', '--accent-hover', '--accent-muted', '--accent-light',
-        '--accent-gradient', '--accent-glow', '--brand-clay',
+        '--accent-gradient', '--accent-glow', '--brand-clay', '--border-focus',
         ...Object.values(VAR_MAP),
       ]
       allVars.forEach((v) => root.style.removeProperty(v))

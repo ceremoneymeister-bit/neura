@@ -50,16 +50,16 @@ export function MemoryPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 p-1 rounded-lg bg-[var(--bg-input)] border border-[var(--border)] w-fit">
+        <div className="flex gap-1 mb-6 p-1 rounded-lg liquid-glass w-fit">
           <button
             onClick={() => setTab('memory')}
-            className={`px-4 py-1.5 text-xs rounded-md transition-colors ${tab === 'memory' ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-medium' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+            className={`px-4 py-1.5 text-xs rounded-full transition-colors ${tab === 'memory' ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-medium' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
           >
             Факты ({memories.length})
           </button>
           <button
             onClick={() => setTab('learnings')}
-            className={`px-4 py-1.5 text-xs rounded-md transition-colors ${tab === 'learnings' ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-medium' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+            className={`px-4 py-1.5 text-xs rounded-full transition-colors ${tab === 'learnings' ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-medium' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
           >
             Уроки
           </button>
@@ -83,7 +83,7 @@ export function MemoryPage() {
           ) : (
             <div className="space-y-2">
               {memories.map((m) => (
-                <div key={m.id} className="group flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 hover:border-[var(--accent)]/20 transition-colors">
+                <div key={m.id} className="group flex items-start gap-3 rounded-xl liquid-glass p-4 hover:border-[var(--accent)]/20 transition-colors">
                   <Lightbulb size={14} className="text-[var(--accent)] mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text-primary)] leading-relaxed">{m.content}</p>
@@ -112,7 +112,7 @@ export function MemoryPage() {
           ) : (
             <div className="space-y-2">
               {learnings.map((l) => (
-                <div key={l.id} className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 hover:border-[var(--accent)]/20 transition-colors">
+                <div key={l.id} className="flex items-start gap-3 rounded-xl liquid-glass p-4 hover:border-[var(--accent)]/20 transition-colors">
                   <span className={`text-xs px-1.5 py-0.5 rounded font-mono shrink-0 ${l.type === 'correction' ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>
                     {l.type === 'correction' ? 'Коррекция' : 'Урок'}
                   </span>

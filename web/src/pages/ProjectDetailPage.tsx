@@ -358,7 +358,7 @@ export function ProjectDetailPage() {
             </Button>
           </div>
 
-          <div className="bg-[var(--bg-card)] border border-[var(--accent)]/20 rounded-2xl p-2 shadow-[0_0_0_1px_var(--accent)/5]">
+          <div className="liquid-glass border-[var(--accent)]/20 rounded-2xl p-2 shadow-[0_0_0_1px_var(--accent)/5]">
             {conversations.length > 5 && (
               <div className="relative px-2 mb-2">
                 <Search size={13} className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
@@ -502,8 +502,8 @@ export function ProjectDetailPage() {
 
               {showAddLink && (
                 <div className="mt-1.5 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
-                  <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="w-full h-7 px-2.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" autoFocus />
-                  <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="Название" className="w-full h-7 px-2.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" />
+                  <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="w-full h-7 px-2.5 rounded-md liquid-glass-input text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" autoFocus />
+                  <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="Название" className="w-full h-7 px-2.5 rounded-md liquid-glass-input text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" />
                   <div className="flex justify-end gap-2">
                     <button onClick={() => { setShowAddLink(false); setNewLinkUrl(''); setNewLinkTitle('') }} className="text-[11px] text-[var(--text-muted)]">Отмена</button>
                     <button onClick={handleAddLink} disabled={!newLinkUrl.trim()} className="text-[11px] text-[var(--accent)] disabled:opacity-40">Добавить</button>
@@ -541,7 +541,7 @@ export function ProjectDetailPage() {
 
               {showAddMember && (
                 <div className="mt-1.5 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
-                  <input value={newCapsuleId} onChange={(e) => setNewCapsuleId(e.target.value)} placeholder="ID капсулы" className="w-full h-7 px-2.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleAddMember() }} />
+                  <input value={newCapsuleId} onChange={(e) => setNewCapsuleId(e.target.value)} placeholder="ID капсулы" className="w-full h-7 px-2.5 rounded-md liquid-glass-input text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors mb-1.5" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleAddMember() }} />
                   <div className="flex justify-end gap-2">
                     <button onClick={() => { setShowAddMember(false); setNewCapsuleId('') }} className="text-[11px] text-[var(--text-muted)]">Отмена</button>
                     <button onClick={handleAddMember} disabled={!newCapsuleId.trim()} className="text-[11px] text-[var(--accent)] disabled:opacity-40">Подключить</button>
@@ -593,7 +593,7 @@ function Section({
         </div>
         {action}
       </div>
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+      <div className="liquid-glass rounded-xl p-4">
         {children}
       </div>
     </div>

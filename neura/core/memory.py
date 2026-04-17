@@ -115,19 +115,56 @@ class MemoryStore:
     # === Diary ===
 
     async def add_diary(self, entry: DiaryEntry) -> int:
-        """Insert a diary entry, return its ID."""
+        """Insert a diary entry, return its ID.
+
+        Uses ON CONFLICT upsert to survive sequence-out-of-sync scenarios
+        (duplicate key on diary_pkey). If the auto-generated id collides with
+        an existing row, the sequence is reset to max(id)+1 and the insert is
+        retried (up to 3 times).
+        """
         # asyncpg requires date/time objects, not strings
         d = date.fromisoformat(entry.date) if isinstance(entry.date, str) else entry.date
         t = time.fromisoformat(entry.time) if isinstance(entry.time, str) else entry.time
-        return await self._pool.fetchval(
-            """INSERT INTO diary (capsule_id, date, time, source,
+
+        insert_sql = """INSERT INTO diary (capsule_id, date, time, source,
                user_message, bot_response, model, duration_sec, tools_used, thread_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-               RETURNING id""",
+               ON CONFLICT (id) DO UPDATE SET
+                   user_message = EXCLUDED.user_message,
+                   bot_response = EXCLUDED.bot_response,
+                   model = EXCLUDED.model,
+                   duration_sec = EXCLUDED.duration_sec,
+                   tools_used = EXCLUDED.tools_used,
+                   source = EXCLUDED.source,
+                   thread_id = EXCLUDED.thread_id
+               RETURNING id"""
+        params = (
             entry.capsule_id, d, t, entry.source,
             entry.user_message, entry.bot_response, entry.model,
             entry.duration_sec, entry.tools_used, entry.thread_id,
         )
+
+        for attempt in range(3):
+            try:
+                return await self._pool.fetchval(insert_sql, *params)
+            except Exception as exc:
+                if "diary_pkey" in str(exc) or "duplicate key" in str(exc).lower():
+                    logger.warning(
+                        "Diary insert hit duplicate PK (attempt %d/3), "
+                        "resetting sequence diary_id_seq",
+                        attempt + 1,
+                    )
+                    try:
+                        await self._pool.execute(
+                            "SELECT setval('diary_id_seq', "
+                            "COALESCE((SELECT MAX(id) FROM diary), 0) + 1, false)"
+                        )
+                    except Exception as seq_err:
+                        logger.error("Failed to reset diary_id_seq: %s", seq_err)
+                    continue
+                raise
+        # Final attempt without catching — let error propagate
+        return await self._pool.fetchval(insert_sql, *params)
 
     async def get_today_diary(self, capsule_id: str, limit: int = 10,
                               thread_id: int | None = None) -> list[DiaryEntry]:
@@ -288,14 +325,32 @@ class MemoryStore:
     # === Learnings & Corrections ===
 
     async def add_learning(self, capsule_id: str, content: str) -> int:
-        """Add a learning entry with embedding for wisdom graduation."""
+        """Add a learning entry with embedding for wisdom graduation (with dedup)."""
         embedding = await _embed_text(content, is_query=False)
         if embedding:
+            existing = await self._pool.fetchval(
+                """SELECT id FROM learnings
+                   WHERE capsule_id = $1 AND type = 'learning'
+                   AND embedding IS NOT NULL
+                   AND (embedding <=> $2::vector) < 0.25
+                   LIMIT 1""",
+                capsule_id, _vec_to_pg_literal(embedding),
+            )
+            if existing:
+                logger.info(f"Skip duplicate learning for {capsule_id}: {content[:60]}")
+                return existing
             return await self._pool.fetchval(
                 """INSERT INTO learnings (capsule_id, type, content, embedding)
                    VALUES ($1, 'learning', $2, $3::vector) RETURNING id""",
                 capsule_id, content, _vec_to_pg_literal(embedding),
             )
+        # Fallback: exact text match
+        existing = await self._pool.fetchval(
+            "SELECT id FROM learnings WHERE capsule_id = $1 AND type = 'learning' AND content = $2",
+            capsule_id, content,
+        )
+        if existing:
+            return existing
         return await self._pool.fetchval(
             """INSERT INTO learnings (capsule_id, type, content)
                VALUES ($1, 'learning', $2) RETURNING id""",
@@ -303,7 +358,32 @@ class MemoryStore:
         )
 
     async def add_correction(self, capsule_id: str, content: str) -> int:
-        """Add a correction entry."""
+        """Add a correction entry (with dedup)."""
+        embedding = await _embed_text(content, is_query=False)
+        if embedding:
+            existing = await self._pool.fetchval(
+                """SELECT id FROM learnings
+                   WHERE capsule_id = $1 AND type = 'correction'
+                   AND embedding IS NOT NULL
+                   AND (embedding <=> $2::vector) < 0.25
+                   LIMIT 1""",
+                capsule_id, _vec_to_pg_literal(embedding),
+            )
+            if existing:
+                logger.info(f"Skip duplicate correction for {capsule_id}: {content[:60]}")
+                return existing
+            return await self._pool.fetchval(
+                """INSERT INTO learnings (capsule_id, type, content, embedding)
+                   VALUES ($1, 'correction', $2, $3::vector) RETURNING id""",
+                capsule_id, content, _vec_to_pg_literal(embedding),
+            )
+        # Fallback: exact text match
+        existing = await self._pool.fetchval(
+            "SELECT id FROM learnings WHERE capsule_id = $1 AND type = 'correction' AND content = $2",
+            capsule_id, content,
+        )
+        if existing:
+            return existing
         return await self._pool.fetchval(
             """INSERT INTO learnings (capsule_id, type, content)
                VALUES ($1, 'correction', $2) RETURNING id""",
@@ -423,7 +503,7 @@ class MemoryStore:
                JOIN learnings l2 ON l1.capsule_id = l2.capsule_id
                    AND l1.id != l2.id
                    AND l1.embedding IS NOT NULL AND l2.embedding IS NOT NULL
-                   AND (l1.embedding <=> l2.embedding) < 0.15
+                   AND (l1.embedding <=> l2.embedding) < 0.35
                WHERE l1.capsule_id = $1 AND l1.type = 'learning'
                GROUP BY l1.content
                HAVING COUNT(DISTINCT DATE(l1.created_at)) >= 2""",
@@ -464,6 +544,126 @@ class MemoryStore:
                 )
             graduated.append(content)
             logger.info(f"Graduated wisdom for {capsule_id}: {content[:80]}...")
+
+        return graduated
+
+    async def graduate_corrections(self, capsule_id: str) -> list[str]:
+        """Graduate recurring corrections to behavioral rules.
+
+        Two pathways:
+        1. Similar corrections (cosine distance < 0.40) appearing 2+ times
+        2. Strong signal corrections (НИКОГДА/ВСЕГДА/ЗАПРЕЩЕНО) — promote after 1 occurrence
+        """
+        import re
+        STRONG_MARKERS = re.compile(
+            r'(?i)\b(НИКОГДА|ВСЕГДА|ЗАПРЕЩЕНО|НЕ делай|НЕ использовать|ОБЯЗАТЕЛЬНО)\b')
+
+        # Pathway 1: recurring similar corrections (2+ occurrences)
+        candidates = await self._pool.fetch(
+            """SELECT l1.content, COUNT(*) as cnt,
+                      MIN(l1.created_at) as first_seen
+               FROM learnings l1
+               JOIN learnings l2 ON l1.capsule_id = l2.capsule_id
+                   AND l1.id != l2.id
+                   AND l1.embedding IS NOT NULL AND l2.embedding IS NOT NULL
+                   AND (l1.embedding <=> l2.embedding) < 0.40
+               WHERE l1.capsule_id = $1 AND l1.type = 'correction'
+               GROUP BY l1.content
+               HAVING COUNT(*) >= 2""",
+            capsule_id,
+        )
+
+        graduated = []
+        for row in candidates:
+            content = row["content"]
+            # Check if already graduated (exact or similar)
+            existing = await self._pool.fetchval(
+                """SELECT COUNT(*) FROM behavioral_rules
+                   WHERE capsule_id = $1 AND rule = $2""",
+                capsule_id, content,
+            )
+            if existing > 0:
+                continue
+
+            embedding = await _embed_text(content, is_query=False)
+            if embedding:
+                # Also check cosine similarity against existing rules
+                similar_rule = await self._pool.fetchval(
+                    """SELECT id FROM behavioral_rules
+                       WHERE capsule_id = $1 AND embedding IS NOT NULL
+                       AND (embedding <=> $2::vector) < 0.30
+                       LIMIT 1""",
+                    capsule_id, _vec_to_pg_literal(embedding),
+                )
+                if similar_rule:
+                    continue
+
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count,
+                        first_seen, embedding)
+                       VALUES ($1, $2, 'correction:recurring', $3, $4, $5::vector)""",
+                    capsule_id, content, row["cnt"],
+                    row["first_seen"], _vec_to_pg_literal(embedding),
+                )
+            else:
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count, first_seen)
+                       VALUES ($1, $2, 'correction:recurring', $3, $4)""",
+                    capsule_id, content, row["cnt"], row["first_seen"],
+                )
+            graduated.append(content)
+            logger.info(f"Graduated correction for {capsule_id}: {content[:80]}...")
+
+        # Pathway 2: strong signal corrections (single occurrence)
+        strong = await self._pool.fetch(
+            """SELECT id, content, created_at FROM learnings
+               WHERE capsule_id = $1 AND type = 'correction'
+               AND embedding IS NOT NULL
+               ORDER BY created_at DESC""",
+            capsule_id,
+        )
+        for row in strong:
+            content = row["content"]
+            if not STRONG_MARKERS.search(content):
+                continue
+            # Check not already graduated
+            existing = await self._pool.fetchval(
+                """SELECT COUNT(*) FROM behavioral_rules
+                   WHERE capsule_id = $1 AND rule = $2""",
+                capsule_id, content,
+            )
+            if existing > 0:
+                continue
+            embedding = await _embed_text(content, is_query=False)
+            if embedding:
+                similar_rule = await self._pool.fetchval(
+                    """SELECT id FROM behavioral_rules
+                       WHERE capsule_id = $1 AND embedding IS NOT NULL
+                       AND (embedding <=> $2::vector) < 0.30
+                       LIMIT 1""",
+                    capsule_id, _vec_to_pg_literal(embedding),
+                )
+                if similar_rule:
+                    continue
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count,
+                        first_seen, embedding)
+                       VALUES ($1, $2, 'correction:strong', 1, $3, $4::vector)""",
+                    capsule_id, content, row["created_at"],
+                    _vec_to_pg_literal(embedding),
+                )
+            else:
+                await self._pool.execute(
+                    """INSERT INTO behavioral_rules
+                       (capsule_id, rule, source_pattern, occurrence_count, first_seen)
+                       VALUES ($1, $2, 'correction:strong', 1, $3)""",
+                    capsule_id, content, row["created_at"],
+                )
+            graduated.append(content)
+            logger.info(f"Promoted strong correction for {capsule_id}: {content[:80]}...")
 
         return graduated
 
@@ -536,8 +736,10 @@ class MemoryStore:
             per_day=ctx_cfg.get("recent_per_day", 10),
             thread_id=thread_id)
         memory = await self.search_memory(capsule_id, user_prompt)
-        learnings = await self.get_learnings(capsule_id)
-        corrections = await self.get_corrections(capsule_id)
+        learnings = await self.get_learnings(
+            capsule_id, limit=ctx_cfg.get("max_learnings", 50))
+        corrections = await self.get_corrections(
+            capsule_id, limit=ctx_cfg.get("max_corrections", 100))
 
         # Layered loading (if enabled in capsule config)
         layered = capsule.config.memory.get("layered_loading", False)

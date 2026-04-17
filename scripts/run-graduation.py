@@ -25,21 +25,31 @@ async def main():
 
     # Get all capsule IDs
     rows = await pool.fetch(
-        "SELECT DISTINCT capsule_id FROM learnings WHERE type='learning'"
+        "SELECT DISTINCT capsule_id FROM learnings"
     )
     capsules = [r["capsule_id"] for r in rows]
-    print(f"Checking {len(capsules)} capsules for wisdom graduation...")
+    print(f"Checking {len(capsules)} capsules for wisdom + correction graduation...")
 
     total = 0
     for cap_id in capsules:
+        # Pathway A: recurring learnings
         graduated = await store.graduate_wisdom(cap_id)
         if graduated:
-            print(f"\n  {cap_id}: {len(graduated)} rules graduated:")
+            print(f"\n  {cap_id}: {len(graduated)} wisdom rules graduated:")
             for rule in graduated:
-                print(f"    → {rule[:80]}...")
+                print(f"    [W] {rule[:80]}...")
             total += len(graduated)
-        else:
-            print(f"  {cap_id}: no recurring patterns found")
+
+        # Pathway B: recurring + strong corrections
+        grad_corr = await store.graduate_corrections(cap_id)
+        if grad_corr:
+            print(f"  {cap_id}: {len(grad_corr)} correction rules graduated:")
+            for rule in grad_corr:
+                print(f"    [C] {rule[:80]}...")
+            total += len(grad_corr)
+
+        if not graduated and not grad_corr:
+            print(f"  {cap_id}: no new patterns found")
 
     print(f"\nTotal graduated: {total}")
     await pool.close()

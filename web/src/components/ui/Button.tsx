@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Spinner } from './Spinner'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,13 +13,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer active:scale-[0.97]'
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 rounded-full disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer active:scale-[0.97]'
 
 const variants: Record<Variant, string> = {
-  primary:   'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] active:bg-[#5b21b6]',
-  secondary: 'bg-[var(--bg-input)] text-[var(--text-primary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] active:bg-[var(--bg-card)]',
-  ghost:     'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] active:bg-[var(--border)]',
-  danger:    'bg-red-600/15 text-red-400 border border-red-600/30 hover:bg-red-600/25 active:bg-red-600/35',
+  primary:   'relative overflow-hidden bg-[var(--accent)]/80 text-white backdrop-blur-lg border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_8px_rgba(0,0,0,0.12)] hover:bg-[var(--accent)]/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_4px_12px_rgba(0,0,0,0.15)] active:bg-[var(--accent)]',
+  secondary: 'liquid-glass-btn text-[var(--text-primary)]',
+  ghost:     'text-[var(--text-secondary)] hover:text-[var(--text-primary)] liquid-glass-nav',
+  danger:    'relative overflow-hidden bg-red-600/15 text-red-400 backdrop-blur-lg border border-red-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-red-600/25 active:bg-red-600/35',
+  glass:     'liquid-glass-btn text-[var(--text-primary)]',
 }
 
 const sizes: Record<Size, string> = {

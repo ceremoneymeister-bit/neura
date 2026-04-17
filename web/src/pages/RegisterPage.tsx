@@ -35,7 +35,7 @@ export function RegisterPage() {
     <div className="flex items-center justify-center min-h-full bg-[var(--bg-primary)] px-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent)] mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--accent)]/80 backdrop-blur-lg border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] mb-4">
             <span className="text-white text-xl font-bold">N</span>
           </div>
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">Создать аккаунт</h1>

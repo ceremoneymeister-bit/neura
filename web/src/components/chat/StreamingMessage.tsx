@@ -183,7 +183,7 @@ function AgentSteps({ steps, collapsed = false }: { steps: ToolStep[]; collapsed
       )}
       {/* Timeline */}
       <div className="relative pl-3 border-l border-[var(--border)]/60">
-        {steps.map((step, i) => (
+        {steps.map((step, _i) => (
           <div key={step.tool_id} className="flex items-center gap-2 py-1 relative">
             {/* Dot on timeline */}
             <div className="absolute -left-[calc(0.75rem+3px)]">
@@ -212,7 +212,7 @@ function AgentSteps({ steps, collapsed = false }: { steps: ToolStep[]; collapsed
 
 export function StreamingMessage({ text, statusText, toolText, toolSteps = [], onStop }: StreamingMessageProps) {
   const isThinking = !text
-  const phaseLabel = useThinkingPhase(isThinking, statusText)
+  useThinkingPhase(isThinking, statusText)
   const elapsed = useElapsed(true)
 
   return (
@@ -239,7 +239,7 @@ export function StreamingMessage({ text, statusText, toolText, toolSteps = [], o
 
               {/* Fallback: old-style tool text when no structured steps */}
               {toolSteps.length === 0 && toolText && (
-                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-2.5 py-1.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border)]">
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-2.5 py-1.5 rounded-lg liquid-glass">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
                   <span className="text-[var(--text-secondary)]">{toolText}</span>
                 </div>

@@ -373,18 +373,21 @@ function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
           </p>
         </div>
 
-        {/* Toggle */}
+        {/* Toggle — Liquid Glass iOS 26 */}
         <button
           onClick={() => onToggle(task.name, !task.enabled)}
           className={[
-            'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0',
-            task.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--border)]',
+            'relative w-11 h-[26px] rounded-full transition-all duration-300 shrink-0',
+            task.enabled
+              ? 'bg-[var(--accent)]/70 backdrop-blur-md border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_4px_rgba(0,0,0,0.1)]'
+              : 'bg-[var(--bg-hover)]/80 backdrop-blur-md border border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]',
           ].join(' ')}
           aria-label={task.enabled ? 'Выключить' : 'Включить'}
         >
           <span className={[
-            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm',
-            task.enabled ? 'left-[18px]' : 'left-0.5',
+            'absolute top-[4px] w-[18px] h-[18px] rounded-full transition-all duration-300',
+            'bg-white/95 shadow-[0_1px_4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.9)]',
+            task.enabled ? 'left-[21px]' : 'left-[3px]',
           ].join(' ')} />
         </button>
       </div>
@@ -400,10 +403,10 @@ function HeartbeatCard({ task, onToggle, onEdit, onDelete }: CardProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={[
-            'text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md',
+            'text-[10px] font-medium uppercase tracking-wider px-2.5 py-0.5 rounded-full backdrop-blur-sm border',
             isTask
-              ? 'bg-amber-500/10 text-amber-400'
-              : 'bg-[var(--accent)]/10 text-[var(--accent)]',
+              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+              : 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20',
           ].join(' ')}>
             {isTask ? 'Автозадача' : 'Напоминание'}
           </span>
@@ -570,7 +573,7 @@ function HeartbeatFormModal({
               {form.type === 'task' ? 'Задание для агента' : 'Текст напоминания'}
             </label>
             <textarea
-              className="w-full rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]/50 resize-none"
+              className="w-full rounded-lg liquid-glass-input text-[var(--text-primary)] placeholder-[var(--text-muted)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]/50 resize-none"
               rows={4}
               placeholder={form.type === 'task'
                 ? 'Опишите что агент должен сделать...\nНапример: Проанализируй задачи на сегодня и составь план действий'
@@ -592,10 +595,10 @@ function HeartbeatFormModal({
                   key={t.value}
                   onClick={() => setForm((f) => ({ ...f, type: t.value }))}
                   className={[
-                    'flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border text-center transition-all',
+                    'flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-2xl text-center transition-all',
                     form.type === t.value
-                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]',
+                      ? 'border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'liquid-glass-btn text-[var(--text-secondary)]',
                   ].join(' ')}
                 >
                   <t.icon size={16} />
@@ -615,10 +618,10 @@ function HeartbeatFormModal({
                   key={p.value}
                   onClick={() => setForm((f) => ({ ...f, scheduleBase: p.value }))}
                   className={[
-                    'px-2.5 py-1 rounded-md text-xs transition-all',
+                    'px-3 py-1.5 rounded-full text-xs transition-all',
                     form.scheduleBase === p.value
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]',
+                      ? 'bg-[var(--accent)]/80 text-white backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      : 'liquid-glass-btn text-[var(--text-secondary)]',
                   ].join(' ')}
                 >
                   {p.label}
@@ -636,10 +639,10 @@ function HeartbeatFormModal({
                   key={p.value}
                   onClick={() => setForm((f) => ({ ...f, scheduleBase: p.value }))}
                   className={[
-                    'px-2.5 py-1 rounded-md text-xs transition-all',
+                    'px-3 py-1.5 rounded-full text-xs transition-all',
                     form.scheduleBase === p.value
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]',
+                      ? 'bg-amber-500/80 text-white backdrop-blur-md border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      : 'liquid-glass-btn text-[var(--text-secondary)]',
                   ].join(' ')}
                 >
                   {p.label}

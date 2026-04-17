@@ -144,15 +144,28 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
     )
 
     # 6d. Heartbeat engine (per-capsule periodic reminders)
+
+    async def _heartbeat_send_telegram(bot, chat_id: int, text: str):
+        """Send message with Markdown parse_mode, fallback to plain text."""
+        try:
+            await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+        except Exception:
+            # Markdown parse error (unmatched *, `, etc.) → plain text
+            try:
+                clean = text.replace('*', '').replace('`', '').replace('_', '')
+                await bot.send_message(chat_id=chat_id, text=clean)
+            except Exception as e:
+                logger.warning(f"Heartbeat plain-text send also failed: {e}")
+
     async def _heartbeat_send(capsule_id: str, telegram_id: int, message: str):
-        """Send heartbeat message via capsule's bot."""
+        """Send heartbeat reminder message via capsule's bot."""
         cap = capsules.get(capsule_id)
         if not cap:
             return
         from telegram import Bot
         bot = Bot(token=cap.config.bot_token)
         try:
-            await bot.send_message(chat_id=telegram_id, text=f"💓 {message}")
+            await _heartbeat_send_telegram(bot, telegram_id, f"💓 {message}")
         except Exception as e:
             logger.warning(f"Heartbeat send failed {capsule_id}→{telegram_id}: {e}")
         finally:
@@ -165,6 +178,7 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
             return
         from neura.core.context import ContextBuilder
         from neura.core.memory import DiaryEntry
+        from neura.transport.protocol import ResponseParser, create_telegraph_page
         from datetime import datetime as _dt, timezone as _tz
 
         try:
@@ -174,19 +188,46 @@ async def create_app(config_dir: str = "config/capsules") -> dict:
             full_prompt = builder.build(prompt, parts, is_first_message=True)
 
             cfg = cap.get_engine_config()
-            # Collect streaming output into a single result
+            # Inject clean-output directive so Claude doesn't narrate its process
+            cfg.append_system_prompt = (
+                "ВАЖНО: Ты выполняешь автозадачу heartbeat. "
+                "Выводи ТОЛЬКО финальный результат для пользователя. "
+                "НЕ описывай процесс ('запускаю', 'читаю', 'анализирую'). "
+                "НЕ добавляй скилл-чек, SESSION_LOG, AI-факт, emoji-статусы. "
+                "Только чистый, готовый к отправке текст."
+            )
+
+            # Collect streaming output — only text chunks, skip tool labels
             result_parts = []
             async for chunk in engine.stream(full_prompt, cfg):
-                if chunk.text:
+                if chunk.type in ("text", "result") and chunk.text:
                     result_parts.append(chunk.text)
             result = "".join(result_parts)
+
+            # Parse markers ([LEARN:], [MEMORY:], [FILE:], etc.)
+            parsed = ResponseParser.parse(result)
+            text = parsed.text.strip()
+
+            if not text:
+                text = "✅ Автозадача выполнена (результат пустой)."
 
             # Send result via bot
             from telegram import Bot
             bot = Bot(token=cap.config.bot_token)
             try:
-                text = result[:4000] if len(result) > 4000 else result
-                await bot.send_message(chat_id=telegram_id, text=f"⚡ {text}")
+                # Telegraph for long messages
+                if len(text) > 4000:
+                    title = text[:50].replace('\n', ' ')
+                    url = create_telegraph_page(title, text)
+                    if url:
+                        preview = text[:300].replace('*', '').replace('#', '').replace('`', '')
+                        await _heartbeat_send_telegram(
+                            bot, telegram_id,
+                            f"{preview}...\n\n📖 Полный ответ: {url}")
+                    else:
+                        await _heartbeat_send_telegram(bot, telegram_id, text[:4000])
+                else:
+                    await _heartbeat_send_telegram(bot, telegram_id, text)
             finally:
                 await bot.shutdown()
 

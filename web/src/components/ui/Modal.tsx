@@ -36,7 +36,7 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
             onClick={onClose}
           />
           <motion.div
-            className={`relative z-10 w-full max-w-md max-w-[calc(100vw-2rem)] max-h-[80vh] overflow-y-auto rounded-lg bg-[var(--bg-card)] border border-[var(--border)] shadow-xl ${className}`}
+            className={`relative z-10 w-full max-w-md max-w-[calc(100vw-2rem)] max-h-[80vh] overflow-y-auto rounded-xl liquid-glass-popup ${className}`}
             initial={{ scale: 0.95, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 8 }}

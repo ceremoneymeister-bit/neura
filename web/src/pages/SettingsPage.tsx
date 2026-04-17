@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
-import { LogOut, Keyboard, Info, Sparkles, User, Sun, Moon, Monitor, Cpu, Zap } from 'lucide-react'
+import { LogOut, Keyboard, Info, Sparkles, User, Sun, Moon, Monitor, Cpu, Zap, Brain, Search } from 'lucide-react'
 import { useTheme, type ThemePreference } from '@/hooks/useTheme'
 import { api } from '@/api/client'
 
@@ -30,19 +30,19 @@ const ENGINES = [
     id: 'claude',
     label: 'Claude Code',
     desc: 'Anthropic CLI — максимальное качество, подписка Max',
-    icon: '🧠',
+    Icon: Brain,
   },
   {
     id: 'opencode',
     label: 'OpenCode',
     desc: 'Open-source агент — любые модели через API',
-    icon: '⚡',
+    Icon: Zap,
   },
   {
     id: 'yandex',
     label: 'YandexGPT',
     desc: 'Яндекс — русскоязычная модель, быстрая и дешёвая',
-    icon: '🔍',
+    Icon: Search,
   },
 ]
 
@@ -85,7 +85,9 @@ export function SettingsPage() {
   useEffect(() => {
     api.get<{engine: string; opencode_model: string; models: OpenCodeModel[]; yandex_model: string; yandex_models: OpenCodeModel[]}>('/api/engine')
       .then(data => {
-        setSelectedEngine(data.engine || 'claude')
+        // localStorage is source of truth — API only provides model lists and defaults
+        const savedEngine = localStorage.getItem('neura_engine')
+        setSelectedEngine(savedEngine || data.engine || 'claude')
         setSelectedOpenCodeModel(data.opencode_model || '')
         setOpenCodeModels(data.models || [])
         setSelectedYandexModel(data.yandex_model || 'yandexgpt-lite')
@@ -155,10 +157,10 @@ export function SettingsPage() {
                 key={t.id}
                 onClick={() => setPreference(t.id)}
                 className={[
-                  'flex-1 flex flex-col items-center gap-2 px-3 py-3.5 rounded-lg border transition-all',
+                  'flex-1 flex flex-col items-center gap-2 px-3 py-3.5 rounded-2xl transition-all',
                   preference === t.id
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                    : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                    ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                    : 'liquid-glass hover:border-[var(--text-muted)]/30',
                 ].join(' ')}
               >
                 <span className={preference === t.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}>
@@ -166,39 +168,6 @@ export function SettingsPage() {
                 </span>
                 <span className="text-sm text-[var(--text-primary)]">{t.label}</span>
                 <span className="text-[10px] text-[var(--text-muted)] leading-tight text-center">{t.desc}</span>
-              </button>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Модель по умолчанию" icon={<Sparkles size={14} />}>
-          <div className="flex flex-col gap-2">
-            {MODELS.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  setSelectedModel(m.id)
-                  localStorage.setItem('neura_model', m.id)
-                }}
-                className={[
-                  'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
-                  selectedModel === m.id
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                    : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
-                ].join(' ')}
-              >
-                <span
-                  className={[
-                    'w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors',
-                    selectedModel === m.id
-                      ? 'border-[var(--accent)] bg-[var(--accent)]'
-                      : 'border-[var(--text-muted)]',
-                  ].join(' ')}
-                />
-                <div className="min-w-0">
-                  <p className="text-sm text-[var(--text-primary)]">{m.label}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{m.desc}</p>
-                </div>
               </button>
             ))}
           </div>
@@ -212,13 +181,13 @@ export function SettingsPage() {
                 onClick={() => updateEngine(e.id)}
                 disabled={engineLoading}
                 className={[
-                  'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                  'flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left',
                   selectedEngine === e.id
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                    : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                    ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                    : 'liquid-glass hover:border-[var(--text-muted)]/30',
                 ].join(' ')}
               >
-                <span className="text-lg shrink-0">{e.icon}</span>
+                <e.Icon size={18} className={selectedEngine === e.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'} />
                 <div className="min-w-0">
                   <p className="text-sm text-[var(--text-primary)]">{e.label}</p>
                   <p className="text-xs text-[var(--text-muted)] mt-0.5">{e.desc}</p>
@@ -231,6 +200,42 @@ export function SettingsPage() {
           </div>
         </Section>
 
+        {selectedEngine === 'claude' && (
+          <Section title="Модель Claude" icon={<Sparkles size={14} />}>
+            <div className="flex flex-col gap-2">
+              {MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setSelectedModel(m.id)
+                    localStorage.setItem('neura_model', m.id)
+                    localStorage.setItem('neura_model_claude', m.id)
+                  }}
+                  className={[
+                    'flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left',
+                    selectedModel === m.id
+                      ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                      : 'liquid-glass hover:border-[var(--text-muted)]/30',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors',
+                      selectedModel === m.id
+                        ? 'border-[var(--accent)] bg-[var(--accent)]'
+                        : 'border-[var(--text-muted)]',
+                    ].join(' ')}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--text-primary)]">{m.label}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{m.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {selectedEngine === 'opencode' && openCodeModels.length > 0 && (
           <Section title="Модель OpenCode" icon={<Zap size={14} />}>
             <div className="flex flex-col gap-2">
@@ -240,10 +245,10 @@ export function SettingsPage() {
                   onClick={() => updateOpenCodeModel(m.id)}
                   disabled={engineLoading}
                   className={[
-                    'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                    'flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left',
                     selectedOpenCodeModel === m.id
-                      ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                      : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                      ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                      : 'liquid-glass hover:border-[var(--text-muted)]/30',
                   ].join(' ')}
                 >
                   <span
@@ -282,10 +287,10 @@ export function SettingsPage() {
                   onClick={() => updateYandexModel(m.id)}
                   disabled={engineLoading}
                   className={[
-                    'flex items-center gap-3 px-3.5 py-3 rounded-lg border transition-all text-left',
+                    'flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left',
                     selectedYandexModel === m.id
-                      ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                      : 'border-[var(--border)] bg-[var(--bg-hover)] hover:border-[var(--text-muted)]/30',
+                      ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                      : 'liquid-glass hover:border-[var(--text-muted)]/30',
                   ].join(' ')}
                 >
                   <span
@@ -365,7 +370,7 @@ function Section({
         {icon && <span className="text-[var(--text-muted)]">{icon}</span>}
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
       </div>
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+      <div className="liquid-glass rounded-xl p-5">
         {children}
       </div>
     </div>

@@ -301,7 +301,8 @@ class TelegramTransport:
                  memory: MemoryStore, queue: RequestQueue,
                  metrics=None, alert_sender=None,
                  skill_collector: SkillUsageCollector | None = None,
-                 skill_evolver: SkillEvolver | None = None):
+                 skill_evolver: SkillEvolver | None = None,
+                 engine_router=None):
         self._capsules = capsules
         self._engine = engine
         self._memory = memory
@@ -310,6 +311,7 @@ class TelegramTransport:
         self._alert_sender = alert_sender
         self._skill_collector = skill_collector
         self._skill_evolver = skill_evolver
+        self._engine_router = engine_router
         self._apps: list[Application] = []
         self._token_to_capsule: dict[str, Capsule] = {}
         self._onboarding: OnboardingManager | None = None  # Set after Redis connected
@@ -337,6 +339,7 @@ class TelegramTransport:
         app.add_handler(CommandHandler("connect_google", self._handle_connect_google))
         app.add_handler(CommandHandler("connect_telegram", self._handle_connect_telegram))
         app.add_handler(CommandHandler("rule", self._handle_rule))
+        app.add_handler(CommandHandler("engine", self._handle_engine))
         app.add_handler(CallbackQueryHandler(self._handle_callback, pattern=r"^onb:"))
         app.add_handler(CallbackQueryHandler(self._handle_action_callback, pattern=r"^action:"))
         app.add_handler(MessageHandler(
@@ -487,6 +490,87 @@ class TelegramTransport:
             logger.info(f"/cancel: processing cancelled for {cap_id} by user {user_id}")
         else:
             await msg.reply_text("ℹ️ Нет активной обработки для отмены.")
+
+    async def _handle_engine(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /engine — switch or show current engine.
+
+        Usage:
+          /engine           — show current engine
+          /engine opencode  — switch to OpenCode
+          /engine claude    — switch to Claude
+          /engine list      — show available models
+          /engine model <name> — change OpenCode model
+        """
+        PRODUCER_ID = 1260958591
+        capsule: Capsule = context.bot_data["capsule"]
+        msg = update.effective_message
+        if not msg:
+            return
+        user_id = update.effective_user.id
+        if user_id != PRODUCER_ID and not capsule.is_employee(user_id):
+            return
+
+        cap_id = capsule.config.id
+        args = msg.text.split()[1:] if msg.text else []
+        router_cfg = capsule.get_router_config()
+
+        if not args:
+            # Show current engine status
+            info = ""
+            if self._engine_router:
+                engine_info = self._engine_router.get_engine_info(cap_id)
+                for name, status in engine_info.items():
+                    health = "🟢" if status["healthy"] else "🔴"
+                    info += f"\n  {health} {name}: {'OK' if status['healthy'] else status.get('last_error', '?')}"
+
+            await msg.reply_text(
+                f"⚙️ Движок капсулы {cap_id}\n"
+                f"Primary: {router_cfg.primary}\n"
+                f"Fallback: {router_cfg.fallback}\n"
+                f"OpenCode модель: {router_cfg.opencode_model}\n"
+                f"Auto-switch: {'✅' if router_cfg.auto_switch else '❌'}"
+                f"{info}"
+            )
+            return
+
+        cmd = args[0].lower()
+
+        if cmd in ("claude", "opencode"):
+            # Switch primary engine
+            capsule.config.engine["primary"] = cmd
+            capsule.config.engine["fallback"] = "opencode" if cmd == "claude" else "claude"
+            await msg.reply_text(f"✅ Движок переключён: primary={cmd}")
+            logger.info(f"/engine: {cap_id} switched to primary={cmd} by user {user_id}")
+            return
+
+        if cmd == "model" and len(args) > 1:
+            model_name = args[1]
+            # Prepend openrouter/ if not present
+            if "/" not in model_name:
+                model_name = f"openrouter/{model_name}"
+            capsule.config.engine["opencode_model"] = model_name
+            await msg.reply_text(f"✅ OpenCode модель: {model_name}")
+            logger.info(f"/engine model: {cap_id} → {model_name} by user {user_id}")
+            return
+
+        if cmd == "list":
+            await msg.reply_text(
+                "📋 Доступные движки:\n"
+                "• claude — Claude Code (Max подписка)\n"
+                "• opencode — OpenCode CLI (API модели)\n\n"
+                "Популярные модели OpenCode:\n"
+                "• openai/gpt-oss-120b (free)\n"
+                "• meta-llama/llama-3.3-70b-instruct (free)\n"
+                "• anthropic/claude-sonnet-4 ($3/1M)\n\n"
+                "Команды:\n"
+                "/engine — текущий статус\n"
+                "/engine claude — переключить на Claude\n"
+                "/engine opencode — переключить на OpenCode\n"
+                "/engine model <name> — сменить модель"
+            )
+            return
+
+        await msg.reply_text("❓ Используй: /engine, /engine claude, /engine opencode, /engine list, /engine model <name>")
 
     async def _handle_test_onboarding(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /test_onboarding — reset onboarding state and restart from phase 0.
@@ -1350,13 +1434,10 @@ class TelegramTransport:
 
         caption = msg.caption or f"Обработай этот документ: {filename}"
 
-        # Extract text via markitdown (DOCX, XLSX, PPTX, HTML, TXT, CSV)
-        # PDF goes directly to Claude CLI (native Read tool support)
-        # .doc (legacy Word) — markitdown не поддерживает, сообщаем пользователю
-        extracted_text = None
         ext_lower = ext.lower()
+
+        # Auto-convert .doc → .docx via LibreOffice
         if ext_lower == ".doc":
-            # Auto-convert .doc → .docx via LibreOffice
             try:
                 import subprocess
                 conv_dir = os.path.dirname(tmp_path)
@@ -1385,24 +1466,43 @@ class TelegramTransport:
                     "(Файл → Сохранить как → DOCX) и отправьте заново."
                 )
                 return
-        if ext_lower not in (".pdf",):
+
+        # Parse document → markdown (PDF via pymupdf4llm, others via markitdown)
+        from neura.core.document_processor import parse_document
+        extracted_text = parse_document(tmp_path)
+        if extracted_text:
+            logger.info(f"parse_document extracted: {len(extracted_text)} chars from {filename}")
+
+        # Auto-ingest into capsule memory (background, non-blocking on failure)
+        ingest_note = ""
+        if extracted_text and self._memory:
             try:
-                from markitdown import MarkItDown
-                md_converter = MarkItDown()
-                result = md_converter.convert(tmp_path)
-                extracted_text = result.text_content
-                logger.info(f"markitdown extracted: {len(extracted_text)} chars from {filename}")
+                from neura.core.auto_ingest import ingest_document
+                chunks = await ingest_document(
+                    self._memory,
+                    capsule.config.id,
+                    tmp_path,
+                    filename,
+                    markdown_text=extracted_text,
+                )
+                if chunks:
+                    ingest_note = f"\n\n📥 Сохранено в память: {chunks} фрагментов — можешь спрашивать об этом документе в будущем."
             except Exception as e:
-                logger.warning(f"markitdown failed for {filename}: {e}")
+                logger.warning(f"auto_ingest failed for {filename}: {e}")
 
         if extracted_text:
-            if len(extracted_text) > 50000:
-                extracted_text = extracted_text[:50000] + "\n\n... (документ обрезан, слишком большой)"
+            # Truncate for Claude context window (full text is in memory)
+            context_text = extracted_text
+            if len(context_text) > 50000:
+                context_text = context_text[:50000] + "\n\n... (документ обрезан для контекста; полный текст сохранён в памяти)"
             prompt = (f"Пользователь отправил документ {filename}.\n\n"
-                      f"Содержимое документа:\n\n{extracted_text}\n\n"
-                      f"Задача: {caption}")
+                      f"Содержимое документа:\n\n{context_text}\n\n"
+                      f"Задача: {caption}{ingest_note}")
         else:
-            prompt = f"Пользователь отправил документ {filename}: {tmp_path}\n\nЗадача: {caption}"
+            # Fallback: let Claude read via Read tool (for encrypted/unusual PDFs)
+            from neura.core.document_processor import build_file_context
+            file_ctx = build_file_context(tmp_path)
+            prompt = f"{file_ctx}\n\nЗадача: {caption}"
 
         incoming = IncomingMessage(
             capsule_id=capsule.config.id,
@@ -1453,18 +1553,26 @@ class TelegramTransport:
                 logger.info(f"[{cap_id}] Directives applied: {directives.raw_directives} → model={engine_cfg.model}")
 
             if existing_session:
-                # RESUME: send user message + vector context for relevant knowledge
+                # RESUME: inject behavioral rules + vector context
+                rules_text = ""
+                try:
+                    rules = await self._memory.get_behavioral_rules(cap_id)
+                    if rules:
+                        rules_text = "🛡️ Помни правила:\n" + "\n".join(f"• {r}" for r in rules) + "\n\n"
+                except Exception as e:
+                    logger.debug(f"[{cap_id}] Resume rules fetch failed: {e}")
+
                 vector_ctx = ""
                 try:
                     vector_ctx = self._memory._vector_search(capsule, incoming.text)
                 except Exception as e:
                     logger.debug(f"[{cap_id}] Resume vector search failed: {e}")
+
+                full_prompt = rules_text + incoming.text
                 if vector_ctx:
-                    full_prompt = incoming.text + "\n\n" + vector_ctx
-                else:
-                    full_prompt = incoming.text
+                    full_prompt += "\n\n" + vector_ctx
                 engine_cfg.resume_session_id = existing_session
-                logger.info(f"[{cap_id}] Resuming session {existing_session[:12]}… prompt={len(full_prompt)} chars (vector: {'yes' if vector_ctx else 'no'})")
+                logger.info(f"[{cap_id}] Resuming session {existing_session[:12]}… prompt={len(full_prompt)} chars (rules: {'yes' if rules_text else 'no'}, vector: {'yes' if vector_ctx else 'no'})")
             else:
                 # NEW SESSION: build full context (system prompt, diary, memory)
                 parts = await self._memory.build_context_parts(
@@ -1495,7 +1603,16 @@ class TelegramTransport:
 
             chunk_count = 0
             cancelled = False
-            async for chunk in self._engine.stream(full_prompt, engine_cfg):
+            # Use engine router if available (dual-engine with fallback)
+            if self._engine_router:
+                _router_cfg = capsule.get_router_config()
+                _stream = self._engine_router.stream(
+                    full_prompt, engine_cfg,
+                    router_cfg=_router_cfg, capsule_id=cap_id,
+                )
+            else:
+                _stream = self._engine.stream(full_prompt, engine_cfg)
+            async for chunk in _stream:
                 # Check for cancellation every 10 chunks
                 if chunk_count % 10 == 0 and chunk_count > 0:
                     if await self._queue.is_cancelled(cap_id):
@@ -1582,10 +1699,15 @@ class TelegramTransport:
             for subj, pred, obj in response.facts:
                 await self._memory.add_triple(cap_id, subj, pred, obj, source="agent")
 
-            # 4a. Auto-extract facts from conversation
+            # 4a. Auto-extract facts from conversation (with dedup)
             auto_mem = _auto_extract_facts(incoming.text, accumulated_text)
             for mem in auto_mem:
-                await self._memory.add_memory(cap_id, mem, source="auto")
+                existing = await self._memory._pool.fetchval(
+                    "SELECT id FROM memory WHERE capsule_id = $1 AND content = $2",
+                    cap_id, mem,
+                )
+                if not existing:
+                    await self._memory.add_memory(cap_id, mem, source="auto")
 
             # 5. Rate warning
             if warn_rate:

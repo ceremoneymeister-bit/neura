@@ -8,8 +8,8 @@ export function NeuraIcon({ size = 28 }: IconProps) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
       <defs>
         <linearGradient id="neura-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#a78bfa" />
+          <stop offset="0%" style={{ stopColor: 'var(--accent, #7c3aed)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--accent-light, #a78bfa)' }} />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="8" fill="url(#neura-grad)" opacity="0.15" />
@@ -37,8 +37,8 @@ export function NeuraThinking({ size = 28 }: IconProps) {
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
       <defs>
         <linearGradient id="neura-think-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#a78bfa" />
+          <stop offset="0%" style={{ stopColor: 'var(--accent, #7c3aed)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--accent-light, #a78bfa)' }} />
         </linearGradient>
       </defs>
       {/* Center glow */}
@@ -82,8 +82,8 @@ export function ProjectIcon({ size = 16 }: IconProps) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <defs>
         <linearGradient id="proj-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#a78bfa" />
+          <stop offset="0%" style={{ stopColor: 'var(--accent, #7c3aed)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--accent-light, #a78bfa)' }} />
         </linearGradient>
       </defs>
       <path
@@ -103,8 +103,8 @@ export function PinIcon({ size = 12 }: IconProps) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <defs>
         <linearGradient id="pin-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#a78bfa" />
+          <stop offset="0%" style={{ stopColor: 'var(--accent, #7c3aed)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--accent-light, #a78bfa)' }} />
         </linearGradient>
       </defs>
       <path
@@ -123,8 +123,8 @@ export function NeuraSparkle({ size = 32 }: IconProps) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
       <defs>
         <linearGradient id="neura-sparkle-grad" x1="0.2" y1="0" x2="0.8" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#a78bfa" />
+          <stop offset="0%" style={{ stopColor: 'var(--accent, #7c3aed)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--accent-light, #a78bfa)' }} />
         </linearGradient>
       </defs>
       <path

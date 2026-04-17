@@ -136,9 +136,9 @@ export function useWebSocket({ conversationId, onMessage, onDone }: UseWebSocket
     return () => disconnect()
   }, [conversationId, connect, disconnect])
 
-  const send = useCallback((text: string, files: string[] = [], model?: string): boolean => {
+  const send = useCallback((text: string, files: string[] = [], model?: string, engine?: string): boolean => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ text, files, ...(model && { model }) }))
+      wsRef.current.send(JSON.stringify({ text, files, ...(model && { model }), ...(engine && { engine }) }))
       // Start stale connection detection — if no message in 45s, emit error
       lastMessageTime.current = Date.now()
       clearStaleTimer()

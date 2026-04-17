@@ -4,6 +4,8 @@ Intelligent document analysis for the Neura platform.
 Analyzes PDFs (structure, type, TOC, scan detection) and builds
 prompt context for Claude to efficiently read documents.
 
+Also provides parse_document() for markdown extraction (pymupdf4llm, OCR, Firecrawl).
+
 Standalone module — no Neura imports required.
 """
 
@@ -21,6 +23,23 @@ try:
     HAS_FITZ = True
 except ImportError:
     HAS_FITZ = False
+
+# pymupdf4llm — PDF → markdown with tables (LLM-optimised)
+try:
+    import pymupdf4llm
+
+    HAS_PYMUPDF4LLM = True
+except ImportError:
+    HAS_PYMUPDF4LLM = False
+
+# pytesseract + pdf2image — OCR for scanned PDFs
+try:
+    import pytesseract
+    from pdf2image import convert_from_path
+
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +406,132 @@ def build_file_context(file_path: str) -> str:
     # Other files
     size_str = _format_size(path.stat().st_size)[1] if path.exists() else "?"
     return f"[Файл: {name}, {size_str}] — прочитай через Read tool: {file_path}"
+
+
+# ---------------------------------------------------------------------------
+# Document Parsing (markdown extraction for LLM context and auto-ingest)
+# ---------------------------------------------------------------------------
+
+_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
+
+
+def parse_document(file_path: str) -> str:
+    """Extract document content as markdown.
+
+    Routing:
+    - PDF (non-scanned) → pymupdf4llm (tables preserved as GFM)
+    - PDF (scanned)     → OCR via pytesseract
+    - DOCX/XLSX/PPTX   → markitdown (unchanged existing path)
+    - Other            → raw text read
+
+    Returns markdown string (may be empty on failure).
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return ""
+
+    ext = path.suffix.lower()
+
+    if ext == ".pdf":
+        return _parse_pdf(file_path)
+
+    # DOCX / XLSX / PPTX / HTML / TXT / CSV → markitdown
+    if ext in (".docx", ".xlsx", ".xls", ".pptx", ".html", ".htm", ".txt", ".csv", ".md"):
+        return _parse_via_markitdown(file_path)
+
+    # Fallback: try markitdown for anything else
+    return _parse_via_markitdown(file_path)
+
+
+def parse_url(url: str) -> str:
+    """Fetch and parse a URL (web page or public PDF) via Firecrawl API.
+
+    Requires FIRECRAWL_API_KEY env variable.
+    Returns markdown string or empty string on failure.
+    """
+    api_key = os.environ.get("FIRECRAWL_API_KEY", "")
+    if not api_key:
+        return ""
+
+    try:
+        from firecrawl import Firecrawl
+        app = Firecrawl(api_key=api_key)
+        result = app.scrape(url, formats=["markdown"])
+        # firecrawl-py v2 returns Document object
+        if hasattr(result, "markdown"):
+            return result.markdown or ""
+        if isinstance(result, dict):
+            return result.get("markdown", "") or ""
+        return ""
+    except Exception:
+        return ""
+
+
+def _parse_pdf(file_path: str) -> str:
+    """Parse PDF to markdown. Uses pymupdf4llm; falls back to OCR if scanned."""
+    # Detect scanned first (fast check)
+    scanned = False
+    if HAS_FITZ:
+        try:
+            doc = fitz.open(file_path)
+            scanned = _is_scanned(doc)
+            doc.close()
+        except Exception:
+            pass
+
+    if scanned:
+        return _parse_scanned_pdf(file_path)
+
+    if HAS_PYMUPDF4LLM:
+        try:
+            md = pymupdf4llm.to_markdown(
+                file_path,
+                table_strategy="lines_strict",
+                force_text=True,
+            )
+            return md or ""
+        except Exception:
+            pass
+
+    # Final fallback: plain text via PyMuPDF
+    if HAS_FITZ:
+        try:
+            doc = fitz.open(file_path)
+            pages_text = []
+            for page in doc:
+                pages_text.append(page.get_text())
+            doc.close()
+            return "\n\n".join(pages_text)
+        except Exception:
+            pass
+
+    return ""
+
+
+def _parse_scanned_pdf(file_path: str) -> str:
+    """OCR a scanned PDF using pdf2image + pytesseract."""
+    if not HAS_OCR:
+        return ""
+    try:
+        images = convert_from_path(file_path, dpi=200)
+        pages_text: list[str] = []
+        for img in images:
+            text = pytesseract.image_to_string(img, lang="rus+eng")
+            pages_text.append(text.strip())
+        return "\n\n---\n\n".join(pages_text)
+    except Exception:
+        return ""
+
+
+def _parse_via_markitdown(file_path: str) -> str:
+    """Convert document to text via markitdown."""
+    try:
+        from markitdown import MarkItDown
+        md_converter = MarkItDown()
+        result = md_converter.convert(file_path)
+        return result.text_content or ""
+    except Exception:
+        return ""
 
 
 # ---------------------------------------------------------------------------

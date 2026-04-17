@@ -69,7 +69,7 @@ function PdfThumbnail({
         canvas.width = viewport.width
         canvas.height = viewport.height
         const ctx = canvas.getContext('2d')!
-        await page.render({ canvasContext: ctx, viewport }).promise
+        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise
         if (!cancelled) setState('ok')
       } catch (e) {
         console.warn('PDF thumbnail error:', e)
@@ -129,7 +129,7 @@ function PdfFullViewer({ url, filename, onClose }: { url: string; filename: stri
       canvas.width = viewport.width
       canvas.height = viewport.height
       const ctx = canvas.getContext('2d')!
-      page.render({ canvasContext: ctx, viewport })
+      page.render({ canvasContext: ctx, viewport, canvas } as any)
     })
     return () => { cancelled = true }
   }, [pdf, currentPage, scale])
@@ -220,7 +220,7 @@ function PdfFullViewer({ url, filename, onClose }: { url: string; filename: stri
                 const v = parseInt(e.target.value)
                 if (v >= 1 && v <= totalPages) setCurrentPage(v)
               }}
-              className="w-12 text-center text-sm bg-[var(--bg-input)] border border-[var(--border)] rounded-md py-1 text-[var(--text-primary)] outline-none"
+              className="w-12 text-center text-sm liquid-glass-input rounded-md py-1 text-[var(--text-primary)] outline-none"
             />
             <span className="text-xs text-[var(--text-muted)]">из {totalPages}</span>
           </div>
@@ -256,7 +256,7 @@ export function FilePreview({ url, filename }: FilePreviewProps) {
     return (
       <>
         <div
-          className="group/fp inline-block max-w-[280px] rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--accent)]/30 transition-all cursor-pointer my-2"
+          className="group/fp inline-block max-w-[280px] rounded-xl overflow-hidden liquid-glass hover:border-[var(--accent)]/30 transition-all cursor-pointer my-2"
           onClick={() => setViewerOpen(true)}
         >
           {/* Thumbnail */}
@@ -303,7 +303,7 @@ export function FilePreview({ url, filename }: FilePreviewProps) {
     <a
       href={url}
       download={displayName}
-      className="inline-flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--accent)]/30 transition-all my-2 max-w-[300px]"
+      className="inline-flex items-center gap-3 px-4 py-3 rounded-xl liquid-glass hover:border-[var(--accent)]/30 transition-all my-2 max-w-[300px]"
     >
       <div className="w-10 h-10 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
         <File size={18} className={fileType === 'pptx' ? 'text-orange-400' : 'text-[var(--accent)]'} />

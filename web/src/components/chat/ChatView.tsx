@@ -146,7 +146,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
     pendingSentRef.current = true
 
     try {
-      const { text, files } = JSON.parse(raw) as { text: string; files: string[] }
+      const { text, files, model, engine } = JSON.parse(raw) as { text: string; files: string[]; model?: string; engine?: string }
       if (!text && (!files || files.length === 0)) return
 
       // Add user message to UI
@@ -171,7 +171,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title } }))
       }
 
-      send(text, files || [])
+      send(text, files || [], model, engine)
     } catch {
       // ignore parse errors
     }
@@ -194,6 +194,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
     if (isNaN(convId)) return
 
+    setConversationModel(undefined)  // reset before async load to avoid stale model
     setIsLoading(true)
 
     // Load conversation model preference
@@ -330,7 +331,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   // ── Send message ──────────────────────────────────────────────
 
-  const handleSend = useCallback(async (text: string, files: string[], model?: string) => {
+  const handleSend = useCallback(async (text: string, files: string[], model?: string, engine?: string) => {
     // Queue message if currently streaming
     if (isStreaming) {
       queuedMessageRef.current = { text, files, model }
@@ -370,7 +371,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       document.dispatchEvent(new CustomEvent('neura:set-chat-title', { detail: { title } }))
     }
 
-    const sent = send(text, files, model)
+    const sent = send(text, files, model, engine)
     if (sent) {
       setIsStreaming(true)
       setStatusText('Думаю...')
@@ -456,7 +457,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               <button
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors px-4 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 disabled:opacity-50"
+                className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors px-4 py-2 rounded-lg liquid-glass-btn disabled:opacity-50"
               >
                 {loadingMore ? 'Загрузка...' : 'Загрузить ранние сообщения'}
               </button>
@@ -510,7 +511,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           onClick={scrollToBottom}
           aria-label="Прокрутить вниз"
           title="Прокрутить вниз"
-          className="absolute bottom-24 right-5 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-lg transition-all animate-fade-in hover:bg-[var(--bg-hover)]"
+          className="absolute bottom-24 right-5 z-10 w-9 h-9 flex items-center justify-center rounded-full liquid-glass text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-lg transition-all animate-fade-in"
         >
           <ChevronDown size={16} />
         </button>

@@ -339,6 +339,7 @@ def create_web_app(
     memory=None,
     queue=None,
     capsules: dict | None = None,
+    engine_router=None,
 ) -> FastAPI:
     """Create and return a configured FastAPI application.
 
@@ -463,6 +464,7 @@ def create_web_app(
     app.state.queue = queue
     app.state.capsules = capsules or {}
     app.state.remote_capsules = _remote_capsules
+    app.state.engine_router = engine_router
 
     # ── Auth shortcuts ───────────────────────────────────────────
 
@@ -1212,14 +1214,15 @@ def create_web_app(
 
     # Available OpenCode models for UI selection
     OPENCODE_MODELS = [
-        {"id": "openrouter/deepseek/deepseek-chat-v3.1", "label": "DeepSeek V3.1", "price": "$0.27/1M", "tier": "budget"},
+        {"id": "openrouter/openai/gpt-oss-120b:free", "label": "GPT-OSS 120B (free)", "price": "free", "tier": "free"},
+        {"id": "openrouter/meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (free)", "price": "free", "tier": "free"},
+        {"id": "openrouter/qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)", "price": "free", "tier": "free"},
+        {"id": "openrouter/deepseek/deepseek-chat-v3.1", "label": "DeepSeek V3.1", "price": "$0.15/1M", "tier": "budget"},
         {"id": "openrouter/deepseek/deepseek-v3.2", "label": "DeepSeek V3.2", "price": "$0.27/1M", "tier": "budget"},
         {"id": "openrouter/google/gemini-2.5-flash", "label": "Gemini 2.5 Flash", "price": "$0.15/1M", "tier": "budget"},
         {"id": "openrouter/google/gemini-2.5-pro", "label": "Gemini 2.5 Pro", "price": "$1.25/1M", "tier": "standard"},
         {"id": "openrouter/anthropic/claude-sonnet-4", "label": "Claude Sonnet 4", "price": "$3/1M", "tier": "premium"},
         {"id": "openrouter/anthropic/claude-opus-4", "label": "Claude Opus 4", "price": "$15/1M", "tier": "premium"},
-        {"id": "openrouter/meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (free)", "price": "free", "tier": "free"},
-        {"id": "openrouter/qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)", "price": "free", "tier": "free"},
     ]
 
     # Available YandexGPT models for UI selection
@@ -1234,17 +1237,14 @@ def create_web_app(
         """Get current engine configuration for user's capsule."""
         capsule_id = current_user.get("capsule_id")
         capsules = request.app.state.capsules
-        if not capsule_id or capsule_id not in capsules:
-            return {"engine": "claude", "models": OPENCODE_MODELS}
 
-        cap = capsules[capsule_id]
-        eng = cap.config.engine
-        return {
-            "engine": eng.get("primary", "claude"),
-            "fallback": eng.get("fallback", "opencode"),
-            "opencode_model": eng.get("opencode_model", "openrouter/deepseek/deepseek-chat-v3.1"),
-            "yandex_model": eng.get("yandex_model", "yandexgpt-lite"),
-            "auto_switch": eng.get("auto_switch", True),
+        # Build response with all available models (works for any user)
+        result = {
+            "engine": "claude",
+            "fallback": "opencode",
+            "opencode_model": "openrouter/openai/gpt-oss-120b:free",
+            "yandex_model": "yandexgpt-lite",
+            "auto_switch": True,
             "models": OPENCODE_MODELS,
             "yandex_models": YANDEX_MODELS,
             "claude_models": [
@@ -1254,15 +1254,30 @@ def create_web_app(
             ],
         }
 
+        # Override with capsule-specific config if available
+        if capsule_id and capsule_id in capsules:
+            eng = capsules[capsule_id].config.engine
+            result["engine"] = eng.get("primary", "claude")
+            result["fallback"] = eng.get("fallback", "opencode")
+            result["opencode_model"] = eng.get("opencode_model", "openrouter/openai/gpt-oss-120b:free")
+            result["yandex_model"] = eng.get("yandex_model", "yandexgpt-lite")
+            result["auto_switch"] = eng.get("auto_switch", True)
+
+        return result
+
     @app.post("/api/engine")
     async def set_engine_config(current_user: CurrentUser, request: Request):
         """Update engine configuration for user's capsule."""
         capsule_id = current_user.get("capsule_id")
         capsules = request.app.state.capsules
-        if not capsule_id or capsule_id not in capsules:
-            return JSONResponse({"error": "Capsule not found"}, 404)
 
         body = await request.json()
+
+        # For remote capsules: accept the config but just acknowledge
+        if not capsule_id or capsule_id not in capsules:
+            logger.info(f"Engine config set for remote/unknown capsule {capsule_id}: {body}")
+            return {"ok": True, "engine": body, "note": "saved_client_side"}
+
         cap = capsules[capsule_id]
 
         if "engine" in body:
@@ -1665,6 +1680,7 @@ def create_web_app(
         user_text: str, engine_cfg, requested_model: str | None,
         db_pool_ref, memory_ref, conv_id: int,
         files: list[str] | None = None,
+        engine_router=None,
     ):
         """Background stream task — runs independently of WebSocket.
 
@@ -1802,7 +1818,15 @@ def create_web_app(
                 had_error = False
                 accumulated = ""
 
-                async for chunk in engine_obj.stream(prompt, engine_cfg):
+                # Use engine router if available (dual-engine with fallback)
+                if engine_router:
+                    _rcfg = capsule.get_router_config()
+                    _stream_gen = engine_router.stream(
+                        prompt, engine_cfg, router_cfg=_rcfg, capsule_id=capsule_id,
+                    )
+                else:
+                    _stream_gen = engine_obj.stream(prompt, engine_cfg)
+                async for chunk in _stream_gen:
                     if chunk.session_id and not result_session_id:
                         result_session_id = chunk.session_id
                     if chunk.type == "text":
@@ -1994,6 +2018,7 @@ def create_web_app(
 
         db_pool = websocket.app.state.db_pool
         engine_obj = websocket.app.state.engine
+        _engine_router = websocket.app.state.engine_router
         capsules_map = websocket.app.state.capsules
 
         # Verify conversation ownership
@@ -2037,6 +2062,7 @@ def create_web_app(
                 user_text = raw.get("text", "").strip()
                 files = raw.get("files", [])
                 requested_model = raw.get("model", None)
+                requested_engine = raw.get("engine", None)
 
                 if not user_text and not files:
                     continue
@@ -2097,6 +2123,17 @@ def create_web_app(
                 if capsule_id and capsules_map:
                     capsule = capsules_map.get(capsule_id)
 
+                # Update capsule engine config from frontend selection
+                if requested_engine and capsule:
+                    capsule.config.engine["primary"] = requested_engine
+                    if requested_engine == "claude":
+                        capsule.config.engine["fallback"] = "opencode"
+                    else:
+                        capsule.config.engine["fallback"] = "claude"
+                    if requested_model and requested_engine == "opencode":
+                        capsule.config.engine["opencode_model"] = requested_model
+                    logger.info(f"[WS] Engine set: {requested_engine}, model={requested_model}")
+
                 # Save user message
                 if db_pool:
                     await db_pool.execute(
@@ -2121,13 +2158,16 @@ def create_web_app(
                         "haiku-4-5": "haiku",
                     }
                     mapped = MODEL_MAP.get(requested_model, requested_model)
-                    engine_cfg = EngineConfig(
-                        model=mapped,
-                        effort=engine_cfg.effort,
-                        allowed_tools=engine_cfg.allowed_tools,
-                        home_dir=engine_cfg.home_dir,
-                        append_system_prompt=engine_cfg.append_system_prompt,
-                    )
+                    # Only update claude model — openrouter/yandex models go via router_cfg,
+                    # NOT into engine_cfg.model (which is only for ClaudeEngine)
+                    if not mapped.startswith("openrouter/") and not mapped.startswith("yandex"):
+                        engine_cfg = EngineConfig(
+                            model=mapped,
+                            effort=engine_cfg.effort,
+                            allowed_tools=engine_cfg.allowed_tools,
+                            home_dir=engine_cfg.home_dir,
+                            append_system_prompt=engine_cfg.append_system_prompt,
+                        )
 
                 # Create background stream session
                 session = stream_mgr.create_session(user_id, conv_id)
@@ -2140,7 +2180,7 @@ def create_web_app(
                         session, engine_obj, capsule, capsule_id,
                         user_text, engine_cfg, requested_model,
                         db_pool, websocket.app.state.memory, conv_id,
-                        files,
+                        files, _engine_router,
                     )
                 )
 

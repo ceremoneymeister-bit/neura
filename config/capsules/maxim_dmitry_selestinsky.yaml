@@ -31,6 +31,8 @@ skills:
 - telegram-bot-builder
 - notion-tasks
 - google-oauth
+- universal-reels
+- neura-reels
 memory:
   layered_loading: true
   knowledge_graph: true
@@ -40,7 +42,11 @@ memory:
   context_window:
     today_diary: 15
     recent_days: 7
-    recent_per_day: 5
+    recent_per_day: 3
+    learnings_chars: 5000
+    corrections_chars: 10000
+    today_diary_chars: 8000
+    recent_diary_chars: 15000
     diary_user_chars: 300
     diary_bot_chars: 400
 employees:

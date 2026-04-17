@@ -33,6 +33,17 @@ HOMES_DIR = Path("/opt/neura-v2/homes")
 
 MSK_OFFSET = timedelta(hours=3)
 
+TZ_MAP = {
+    "europe/moscow": 3, "msk": 3, "москва": 3,
+    "asia/novosibirsk": 7, "nsk": 7, "новосибирск": 7,
+    "asia/yekaterinburg": 5, "екатеринбург": 5,
+    "asia/krasnoyarsk": 7, "красноярск": 7,
+    "asia/almaty": 6, "алматы": 6,
+    "europe/minsk": 3, "минск": 3,
+    "europe/kiev": 2, "europe/kyiv": 2, "киев": 2,
+    "utc": 0, "gmt": 0,
+}
+
 DAY_MAP = {
     "понедельник": 0, "пн": 0, "monday": 0, "mon": 0,
     "вторник": 1, "вт": 1, "tuesday": 1, "tue": 1,
@@ -61,11 +72,19 @@ class HeartbeatTask:
     recipient_telegram_id: int | None = None  # Override: send to this ID instead of owner
     enabled: bool = True
     task_type: str = "reminder"  # "reminder" | "task"
+    tz_offset_hours: int = 3     # Default MSK (UTC+3). Override per-task via timezone field.
 
     @property
     def target_telegram_id(self) -> int:
         """Actual recipient: explicit override or owner."""
         return self.recipient_telegram_id if self.recipient_telegram_id else self.owner_telegram_id
+
+
+def _resolve_tz_offset(tz_str: str | None) -> int:
+    """Resolve timezone string to UTC offset in hours. Default: 3 (MSK)."""
+    if not tz_str:
+        return 3
+    return TZ_MAP.get(tz_str.lower().strip(), 3)
 
 
 def parse_heartbeat_config(capsule_id: str, owner_telegram_id: int,
@@ -76,15 +95,24 @@ def parse_heartbeat_config(capsule_id: str, owner_telegram_id: int,
         if not item.get("name") or not item.get("message"):
             logger.warning(f"Heartbeat task missing name/message in {capsule_id}")
             continue
+        # Validate recipient_telegram_id type
+        recipient_id = item.get("recipient_telegram_id")
+        if recipient_id is not None:
+            try:
+                recipient_id = int(recipient_id)
+            except (ValueError, TypeError):
+                logger.warning(f"Heartbeat invalid recipient_telegram_id in {capsule_id}/{item['name']}")
+                recipient_id = None
         tasks.append(HeartbeatTask(
             name=item["name"],
             message=item["message"],
             schedule=item.get("schedule", "daily 10:00"),
             capsule_id=capsule_id,
             owner_telegram_id=owner_telegram_id,
-            recipient_telegram_id=item.get("recipient_telegram_id"),
+            recipient_telegram_id=recipient_id,
             enabled=item.get("enabled", True),
             task_type=item.get("type", "reminder"),
+            tz_offset_hours=_resolve_tz_offset(item.get("timezone")),
         ))
     return tasks
 
@@ -92,13 +120,14 @@ def parse_heartbeat_config(capsule_id: str, owner_telegram_id: int,
 def should_fire(task: HeartbeatTask, now_utc: datetime) -> bool:
     """Check if a heartbeat task should fire at the given UTC time.
 
-    Uses Moscow time for schedule matching.
-    Returns True if current hour:minute matches (within 30-min window).
+    Uses task's timezone (default MSK) for schedule matching.
+    Returns True if current hour:minute matches (within 15-min window).
     """
     if not task.enabled:
         return False
 
-    msk = now_utc + MSK_OFFSET
+    local_offset = timedelta(hours=task.tz_offset_hours)
+    local_now = now_utc + local_offset
     schedule = task.schedule.lower().strip()
 
     # "every Nh" or "every Nm"
@@ -114,22 +143,23 @@ def should_fire(task: HeartbeatTask, now_utc: datetime) -> bool:
     target_h = int(time_match.group(1))
     target_m = int(time_match.group(2))
 
-    # Check if current time is within 30-min window of target
-    if msk.hour != target_h:
+    # Check if current time is within 15-min window of target
+    if local_now.hour != target_h:
         return False
-    if abs(msk.minute - target_m) > 15:
+    if abs(local_now.minute - target_m) > 15:
         return False
 
-    # "daily HH:MM"
+    # "daily HH:MM" or "ежедневно HH:MM"
     if schedule.startswith("daily") or schedule.startswith("ежедневно"):
         return True
 
     # "<weekday> HH:MM"
     for day_name, day_idx in DAY_MAP.items():
         if day_name in schedule:
-            return msk.weekday() == day_idx
+            return local_now.weekday() == day_idx
 
-    return False
+    # Bare "HH:MM" without prefix → treat as daily (fix: silent no-fire bug)
+    return True
 
 
 def get_interval_seconds(task: HeartbeatTask) -> int:
@@ -179,11 +209,10 @@ class HeartbeatEngine:
                         f"for {enabled[0].capsule_id}")
 
     async def start(self) -> None:
-        if not self._tasks:
-            logger.info("HeartbeatEngine: no tasks registered, skipping")
-            return
+        # Always start the loop — hot-reload picks up heartbeat.yaml from homes/
         self._loop_task = asyncio.create_task(self._run_loop())
-        logger.info(f"HeartbeatEngine started ({len(self._tasks)} task(s))")
+        logger.info(f"HeartbeatEngine started ({len(self._tasks)} static task(s), "
+                    f"hot-reload enabled)")
 
     async def stop(self) -> None:
         if self._loop_task:
@@ -215,9 +244,15 @@ class HeartbeatEngine:
                 if not should_fire(task, now):
                     continue
 
-                # Dedup via Redis
+                # Atomic dedup via Redis SETNX (prevents race condition on concurrent fires)
                 dedup_key = f"neura:heartbeat:last:{task.capsule_id}:{task.name}"
-                last_raw = await self._redis.get(dedup_key)
+                lock_key = f"neura:heartbeat:lock:{task.capsule_id}:{task.name}"
+
+                try:
+                    last_raw = await self._redis.get(dedup_key)
+                except Exception as redis_err:
+                    logger.warning(f"Heartbeat Redis read failed {task.capsule_id}/{task.name}: {redis_err}")
+                    continue  # Skip task when Redis is down (safer than firing without dedup)
 
                 interval = get_interval_seconds(task)
                 if interval > 0:
@@ -232,24 +267,47 @@ class HeartbeatEngine:
                         last_date = datetime.fromtimestamp(
                             float(last_raw), tz=timezone.utc
                         ).date()
-                        msk_today = (now + MSK_OFFSET).date()
-                        if last_date == msk_today:
+                        local_offset = timedelta(hours=task.tz_offset_hours)
+                        local_today = (now + local_offset).date()
+                        if last_date == local_today:
                             continue
 
-                # Fire!
-                if task.task_type == "task" and self._run_task:
-                    await self._run_task(
-                        task.capsule_id, task.target_telegram_id, task.name, task.message
+                # Acquire lock atomically (SETNX) — prevents double-fire race
+                try:
+                    acquired = await self._redis.set(
+                        lock_key, "1", nx=True, ex=900  # 15-min lock TTL
                     )
-                else:
-                    await self._send(
-                        task.capsule_id, task.target_telegram_id, task.message
-                    )
-                await self._redis.set(
-                    dedup_key, str(now.timestamp()), ex=7 * 86400
-                )
-                fired += 1
-                logger.info(f"💓 Heartbeat fired: {task.capsule_id}/{task.name}")
+                    if not acquired:
+                        continue  # Another cycle is already executing this task
+                except Exception as redis_err:
+                    logger.warning(f"Heartbeat Redis lock failed {task.capsule_id}/{task.name}: {redis_err}")
+                    continue
+
+                try:
+                    # Fire!
+                    if task.task_type == "task" and self._run_task:
+                        await self._run_task(
+                            task.capsule_id, task.target_telegram_id, task.name, task.message
+                        )
+                    else:
+                        await self._send(
+                            task.capsule_id, task.target_telegram_id, task.message
+                        )
+                    # Mark fired timestamp
+                    try:
+                        await self._redis.set(
+                            dedup_key, str(now.timestamp()), ex=7 * 86400
+                        )
+                    except Exception:
+                        pass  # Non-critical: worst case = fires again next cycle
+                    fired += 1
+                    logger.info(f"💓 Heartbeat fired: {task.capsule_id}/{task.name}")
+                finally:
+                    # Release lock
+                    try:
+                        await self._redis.delete(lock_key)
+                    except Exception:
+                        pass  # Lock will auto-expire via TTL
 
             except Exception as e:
                 logger.warning(f"Heartbeat error {task.capsule_id}/{task.name}: {e}")
@@ -305,14 +363,16 @@ class HeartbeatEngine:
                 for item in raw:
                     name = item.get("name", "")
                     key = (capsule_id, name)
+                    tz_offset = _resolve_tz_offset(item.get("timezone"))
                     if key in existing_keys:
-                        # Update existing task
+                        # Update existing task (including enabled/disabled toggle)
                         for t in self._tasks:
                             if t.capsule_id == capsule_id and t.name == name:
                                 t.message = item.get("message", t.message)
                                 t.schedule = item.get("schedule", t.schedule)
                                 t.enabled = item.get("enabled", True)
                                 t.task_type = item.get("type", t.task_type)
+                                t.tz_offset_hours = tz_offset
                                 break
                     else:
                         # New task
@@ -324,6 +384,7 @@ class HeartbeatEngine:
                             owner_telegram_id=owner_id,
                             enabled=item.get("enabled", True),
                             task_type=item.get("type", "reminder"),
+                            tz_offset_hours=tz_offset,
                         )
                         if task.name and task.message and task.schedule:
                             self._tasks.append(task)

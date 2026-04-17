@@ -227,7 +227,7 @@ textarea:focus-visible,
 
 /* ── Utility classes ─────────────────────────────────────── */
 .glow-accent {
-  box-shadow: 0 0 20px rgba(124, 58, 237, 0.25);
+  box-shadow: var(--accent-glow);
 }
 
 .gradient-text {
@@ -526,7 +526,7 @@ textarea:focus-visible,
 
 /* Inline code */
 .prose-neura code:not(pre code) {
-  background: rgba(124, 58, 237, 0.08);
+  background: var(--accent-muted);
   color: var(--code-inline);
   padding: 0.15em 0.4em;
   border-radius: 4px;

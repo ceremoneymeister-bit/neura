@@ -27,7 +27,7 @@ export function SearchBar({ value, onChange, placeholder = 'Поиск... Ctrl+K
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-7 pl-7 pr-6 rounded-md bg-[var(--bg-hover)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
+        className="w-full h-7 pl-7 pr-6 rounded-md liquid-glass-input text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/50 transition-colors"
       />
       {value && (
         <button
